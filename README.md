@@ -3,6 +3,19 @@
 A native macOS menu bar app that tracks how long your Mac is unlocked and reports daily and
 weekly totals against limits you set.
 
+Built with GitHub Copilot, from the first prototype through to the current app.
+
+## Screenshots
+
+| Light | Dark |
+| --- | --- |
+| ![The menu bar panel](docs/panel-light.png) | ![The menu bar panel in dark appearance](docs/panel-dark.png) |
+| ![The History window](docs/history-light.png) | ![The History window in dark appearance](docs/history-dark.png) |
+| ![Editing a session](docs/edit-light.png) | ![Editing a session in dark appearance](docs/edit-dark.png) |
+
+These use generated sample data rather than real hours. Run the app with `--demo` to reproduce
+them.
+
 ## What it shows
 
 - Today's total against the daily maximum.
@@ -64,27 +77,32 @@ minutes. Idle pausing defaults to on with a 10-minute threshold.
 **Start at login** registers the app as a login item, so tracking resumes after a restart
 without opening it manually.
 
-**Import work log** reads completed intervals from a plain text file:
-
-```text
-2026-08-17 08:20-14:30+16:00-23:30
-2026-08-19 PTO
-2026-08-20 PTO 09:00-11:00
-```
-
-One date per line, with intervals joined by `+` and an optional leading `PTO` marker. Blank
-lines and lines starting with `#` are ignored, and open intervals are rejected. A session
-running to midnight ends at `24:00`. Exact duplicates are skipped, so importing the same file
-twice is safe.
-
-**Export** in the History window writes this same format, so exports can be re-imported. Times
-are written to the minute, and a session in progress is written up to the current time.
+**Import work log** reads a plain text file in the [work log format](#work-log-format). Exact
+duplicates are skipped, so importing the same file twice is safe.
 
 History and settings are stored locally:
 
 ```text
 ~/Library/Application Support/UnlockedTime/history.json
 ```
+
+## Work log format
+
+Import and export share one plain text format:
+
+```text
+# a hash starts a comment
+2026-08-17 08:20-14:30+16:00-23:30
+2026-08-19 PTO
+2026-08-20 PTO 09:00-11:00
+```
+
+Each line is a date followed by a `PTO` marker, one or more intervals, or both. Intervals are
+joined with `+`. Blank lines and comments are ignored, open intervals are rejected, and a
+session running to midnight ends at `24:00`.
+
+**Export** in the History window writes this format, so anything exported can be imported again.
+Times are written to the minute, and a session in progress is written up to the current time.
 
 ## Build
 
@@ -99,6 +117,12 @@ Import a work log at launch:
 
 ```sh
 open -n "dist/Unlocked Time.app" --args --import ~/time_worked.txt
+```
+
+Run against generated sample data instead of your own history, as used for the screenshots:
+
+```sh
+open -n "dist/Unlocked Time.app" --args --demo
 ```
 
 The app has no Dock icon. Keep it running for tracking to continue.
@@ -116,3 +140,7 @@ iconutil -c icns App/AppIcon.iconset -o App/AppIcon.icns
 ```sh
 swift test
 ```
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
