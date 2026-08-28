@@ -7,6 +7,7 @@ final class TrackingController: ObservableObject {
     @Published private(set) var data: StoredTimeData
     @Published private(set) var now = Date()
     @Published private(set) var storageError: String?
+    @Published private(set) var pausedByIdle = false
 
     private let store: TimeStore
     private var workspaceObservers: [NSObjectProtocol] = []
@@ -57,9 +58,16 @@ final class TrackingController: ObservableObject {
     var settings: TrackingSettings { data.settings }
     var isTracking: Bool { data.sessions.last?.end == nil }
 
-    func updateSettings(dailyLimitMinutes: Int, weeklyLimitMinutes: Int) {
+    func updateSettings(
+        dailyLimitMinutes: Int,
+        weeklyLimitMinutes: Int,
+        pausesWhenIdle: Bool,
+        idleThresholdMinutes: Int
+    ) {
         data.settings.dailyLimitMinutes = dailyLimitMinutes
         data.settings.weeklyLimitMinutes = weeklyLimitMinutes
+        data.settings.pausesWhenIdle = pausesWhenIdle
+        data.settings.idleThresholdMinutes = idleThresholdMinutes
         persist()
     }
 
@@ -68,6 +76,7 @@ final class TrackingController: ObservableObject {
         data.sessions.append(WorkSession(start: date))
         data.lastHeartbeat = date
         now = date
+        pausedByIdle = false
         persist()
     }
 
@@ -101,9 +110,29 @@ final class TrackingController: ObservableObject {
     }
 
     private func heartbeat() {
-        now = Date()
+        let current = Date()
+        now = current
+
+        if data.settings.pausesWhenIdle {
+            let idle = Self.idleSeconds
+            let threshold = TimeInterval(max(data.settings.idleThresholdMinutes, 1) * 60)
+
+            if isTracking, idle >= threshold {
+                stopSession(at: current.addingTimeInterval(-idle))
+                pausedByIdle = true
+                now = current
+                return
+            }
+
+            if pausedByIdle, !isTracking, idle < threshold, !Self.screenIsLocked {
+                startSession(at: current.addingTimeInterval(-idle))
+                now = current
+                return
+            }
+        }
+
         if isTracking {
-            data.lastHeartbeat = now
+            data.lastHeartbeat = current
             persist()
         }
     }
@@ -151,6 +180,11 @@ final class TrackingController: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.startSession() }
         })
+    }
+
+    private static var idleSeconds: TimeInterval {
+        guard let anyInput = CGEventType(rawValue: ~0) else { return 0 }
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
     }
 
     private static var screenIsLocked: Bool {

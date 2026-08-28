@@ -191,7 +191,7 @@ private struct DashboardView: View {
 
     private var statusText: String {
         guard controller.isTracking, let start = controller.sessions.last(where: { $0.end == nil })?.start else {
-            return "Paused"
+            return controller.pausedByIdle ? "Paused while idle" : "Paused"
         }
         return "Since \(start.formatted(date: .omitted, time: .shortened))"
     }
@@ -500,11 +500,15 @@ private struct SettingsView: View {
     @State private var importMessage: String?
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
+    @State private var pausesWhenIdle: Bool
+    @State private var idleThresholdMinutes: Int
 
     init(controller: TrackingController) {
         self.controller = controller
         _dailyLimitMinutes = State(initialValue: controller.settings.dailyLimitMinutes)
         _weeklyLimitMinutes = State(initialValue: controller.settings.weeklyLimitMinutes)
+        _pausesWhenIdle = State(initialValue: controller.settings.pausesWhenIdle)
+        _idleThresholdMinutes = State(initialValue: controller.settings.idleThresholdMinutes)
     }
 
     var body: some View {
@@ -516,6 +520,14 @@ private struct SettingsView: View {
                 Stepper(value: $weeklyLimitMinutes, in: 15...(7 * 24 * 60), step: 15) {
                     LabeledContent("Weekly maximum", value: formatMinutes(weeklyLimitMinutes))
                 }
+            }
+
+            Section("Tracking") {
+                Toggle("Pause when idle", isOn: $pausesWhenIdle)
+                Stepper(value: $idleThresholdMinutes, in: 1...120, step: 1) {
+                    LabeledContent("Idle after", value: "\(idleThresholdMinutes) min")
+                }
+                .disabled(!pausesWhenIdle)
             }
 
             Section("Startup") {
@@ -547,9 +559,11 @@ private struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 400)
+        .frame(width: 420, height: 470)
         .onChange(of: dailyLimitMinutes) { _, _ in save() }
         .onChange(of: weeklyLimitMinutes) { _, _ in save() }
+        .onChange(of: pausesWhenIdle) { _, _ in save() }
+        .onChange(of: idleThresholdMinutes) { _, _ in save() }
         .onChange(of: launchAtLogin) { _, isOn in
             do {
                 try LoginItem.setEnabled(isOn)
@@ -575,7 +589,9 @@ private struct SettingsView: View {
     private func save() {
         controller.updateSettings(
             dailyLimitMinutes: dailyLimitMinutes,
-            weeklyLimitMinutes: weeklyLimitMinutes
+            weeklyLimitMinutes: weeklyLimitMinutes,
+            pausesWhenIdle: pausesWhenIdle,
+            idleThresholdMinutes: idleThresholdMinutes
         )
     }
 }

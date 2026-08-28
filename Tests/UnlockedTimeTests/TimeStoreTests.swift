@@ -19,6 +19,22 @@ struct TimeStoreTests {
         #expect(actual == expected)
     }
 
+    @Test func loadsSettingsWrittenBeforeIdleFieldsExisted() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: "history.json")
+        let legacy = #"{"sessions":[],"settings":{"dailyLimitMinutes":480,"weeklyLimitMinutes":2250}}"#
+        try Data(legacy.utf8).write(to: url)
+
+        let data = try TimeStore(fileURL: url).load()
+
+        #expect(data.settings.dailyLimitMinutes == 480)
+        #expect(data.settings.weeklyLimitMinutes == 2250)
+        #expect(data.settings.pausesWhenIdle)
+        #expect(data.settings.idleThresholdMinutes == 10)
+    }
+
     @Test func missingStoreStartsEmpty() throws {
         let url = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString)
