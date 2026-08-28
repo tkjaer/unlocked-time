@@ -264,6 +264,15 @@ enum TimeSummary {
         return nil
     }
 
+    /// Time above the ceiling only. Being under a maximum is not a debt, so it does not offset.
+    static func overage(_ totals: [PeriodTotal]) -> OverageSummary {
+        let over = totals.filter(\.isOver)
+        return OverageSummary(
+            periodsOver: over.count,
+            minutes: over.reduce(0) { $0 + $1.overageMinutes }
+        )
+    }
+
     private static func series(
         totals: [PeriodTotal],
         anchor: Date,
@@ -317,6 +326,13 @@ enum TimeSummary {
             PeriodTotal(start: start, minutes: Int(seconds / 60), limitMinutes: limitMinutes)
         }.sorted { $0.start > $1.start }
     }
+}
+
+struct OverageSummary: Equatable, Sendable {
+    var periodsOver = 0
+    var minutes = 0
+
+    var isClean: Bool { periodsOver == 0 }
 }
 
 enum LimitCheck {

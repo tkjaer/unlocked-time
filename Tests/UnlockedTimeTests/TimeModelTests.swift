@@ -273,6 +273,27 @@ struct TimeModelTests {
         #expect(TimeSummary.weekKey(date(2026, 8, 28), calendar: calendar) == "2026-W35")
     }
 
+    @Test func overageCountsOnlyTimeAboveTheLimit() {
+        let totals = [
+            PeriodTotal(start: date(2026, 8, 3), minutes: 2_000, limitMinutes: 2_400),
+            PeriodTotal(start: date(2026, 8, 10), minutes: 2_700, limitMinutes: 2_400),
+            PeriodTotal(start: date(2026, 8, 17), minutes: 2_500, limitMinutes: 2_400)
+        ]
+
+        let summary = TimeSummary.overage(totals)
+
+        #expect(summary.periodsOver == 2)
+        #expect(summary.minutes == 400)
+        #expect(!summary.isClean)
+    }
+
+    @Test func overageIsCleanWhenEveryPeriodIsUnder() {
+        let totals = [PeriodTotal(start: date(2026, 8, 3), minutes: 100, limitMinutes: 2_400)]
+
+        #expect(TimeSummary.overage(totals) == OverageSummary())
+        #expect(TimeSummary.overage(totals).isClean)
+    }
+
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: year,
