@@ -106,6 +106,48 @@ struct TimeModelTests {
         #expect(crossing == nil)
     }
 
+    @Test func marksPTODaysInDailySeries() {
+        let series = TimeSummary.dailySeries(
+            sessions: [],
+            now: date(2026, 8, 28, 12),
+            limitMinutes: 8 * 60,
+            count: 3,
+            ptoDays: [TimeSummary.dayKey(date(2026, 8, 27), calendar: calendar)],
+            calendar: calendar
+        )
+
+        #expect(series.map(\.isPTO) == [false, true, false])
+    }
+
+    @Test func weekCountsAsPTOOnlyWhenEveryDayMarked() {
+        let weekStart = date(2026, 8, 24)
+        var keys = Set((0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: offset, to: weekStart)
+                .map { TimeSummary.dayKey($0, calendar: calendar) }
+        })
+
+        let whole = TimeSummary.weeklySeries(
+            sessions: [],
+            now: date(2026, 8, 28, 12),
+            limitMinutes: 40 * 60,
+            count: 1,
+            ptoDays: keys,
+            calendar: calendar
+        )
+        #expect(whole[0].isPTO)
+
+        keys.remove(TimeSummary.dayKey(date(2026, 8, 26), calendar: calendar))
+        let partial = TimeSummary.weeklySeries(
+            sessions: [],
+            now: date(2026, 8, 28, 12),
+            limitMinutes: 40 * 60,
+            count: 1,
+            ptoDays: keys,
+            calendar: calendar
+        )
+        #expect(!partial[0].isPTO)
+    }
+
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: year,

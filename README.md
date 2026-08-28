@@ -11,7 +11,16 @@ weekly totals against limits you set.
 - The moment the weekly limit was reached, once it is passed.
 - A trend chart of the last 7 days or 8 weeks, with the limit marked.
 - A matching list of those days or weeks.
+- Which days or weeks are marked as PTO.
 - Manual pause and resume.
+
+## PTO
+
+Right-click a day or week in the history list to mark it as PTO, or to clear the mark. Marking a
+week marks all seven of its days, and a week shows as PTO only when every day is marked.
+
+PTO is a label. It does not change any total or limit, and time tracked on a PTO day is still
+counted. It exists so a day off can be told apart from a day that simply went untracked.
 
 ## Tracking
 

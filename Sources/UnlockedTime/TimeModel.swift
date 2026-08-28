@@ -49,6 +49,7 @@ struct PeriodTotal: Identifiable, Equatable, Sendable {
     let start: Date
     let minutes: Int
     let limitMinutes: Int
+    var isPTO = false
 
     var id: Date { start }
     var overageMinutes: Int { max(0, minutes - limitMinutes) }
@@ -85,6 +86,7 @@ enum TimeSummary {
         now: Date,
         limitMinutes: Int,
         count: Int,
+        ptoDays: Set<String> = [],
         calendar: Calendar = .current
     ) -> [PeriodTotal] {
         series(
@@ -93,7 +95,8 @@ enum TimeSummary {
             component: .day,
             count: count,
             limitMinutes: limitMinutes,
-            calendar: calendar
+            calendar: calendar,
+            isPTO: { ptoDays.contains(dayKey($0, calendar: calendar)) }
         )
     }
 
@@ -102,6 +105,7 @@ enum TimeSummary {
         now: Date,
         limitMinutes: Int,
         count: Int,
+        ptoDays: Set<String> = [],
         calendar: Calendar = .current
     ) -> [PeriodTotal] {
         series(
@@ -110,8 +114,23 @@ enum TimeSummary {
             component: .weekOfYear,
             count: count,
             limitMinutes: limitMinutes,
-            calendar: calendar
+            calendar: calendar,
+            isPTO: { weekIsPTO(weekStart: $0, ptoDays: ptoDays, calendar: calendar) }
         )
+    }
+
+    /// Calendar day identity, so a marked day cannot drift with time zone or daylight saving changes.
+    static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    static func weekIsPTO(weekStart: Date, ptoDays: Set<String>, calendar: Calendar = .current) -> Bool {
+        guard !ptoDays.isEmpty else { return false }
+        return (0..<7).allSatisfy { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: weekStart) else { return false }
+            return ptoDays.contains(dayKey(day, calendar: calendar))
+        }
     }
 
     /// Moment within the current week when accumulated time first reached the weekly limit.
@@ -150,7 +169,8 @@ enum TimeSummary {
         component: Calendar.Component,
         count: Int,
         limitMinutes: Int,
-        calendar: Calendar
+        calendar: Calendar,
+        isPTO: (Date) -> Bool
     ) -> [PeriodTotal] {
         var minutesByStart: [Date: Int] = [:]
 
@@ -160,7 +180,12 @@ enum TimeSummary {
 
         return (0..<max(count, 0)).reversed().map { offset in
             let start = calendar.date(byAdding: component, value: -offset, to: anchor)!
-            return PeriodTotal(start: start, minutes: minutesByStart[start] ?? 0, limitMinutes: limitMinutes)
+            return PeriodTotal(
+                start: start,
+                minutes: minutesByStart[start] ?? 0,
+                limitMinutes: limitMinutes,
+                isPTO: isPTO(start)
+            )
         }
     }
 
