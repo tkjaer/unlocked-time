@@ -17,17 +17,23 @@ struct TrackingSettings: Codable, Equatable, Sendable {
     var weeklyLimitMinutes: Int
     var pausesWhenIdle: Bool
     var idleThresholdMinutes: Int
+    var ptoReducesWeeklyLimit: Bool
+    var ptoDayMinutes: Int
 
     init(
         dailyLimitMinutes: Int = 8 * 60,
         weeklyLimitMinutes: Int = 40 * 60,
         pausesWhenIdle: Bool = true,
-        idleThresholdMinutes: Int = 10
+        idleThresholdMinutes: Int = 10,
+        ptoReducesWeeklyLimit: Bool = false,
+        ptoDayMinutes: Int = 450
     ) {
         self.dailyLimitMinutes = dailyLimitMinutes
         self.weeklyLimitMinutes = weeklyLimitMinutes
         self.pausesWhenIdle = pausesWhenIdle
         self.idleThresholdMinutes = idleThresholdMinutes
+        self.ptoReducesWeeklyLimit = ptoReducesWeeklyLimit
+        self.ptoDayMinutes = ptoDayMinutes
     }
 
     /// Files written before a field existed must still load, so every key falls back to its default.
@@ -42,6 +48,10 @@ struct TrackingSettings: Codable, Equatable, Sendable {
             ?? defaults.pausesWhenIdle
         idleThresholdMinutes = try container.decodeIfPresent(Int.self, forKey: .idleThresholdMinutes)
             ?? defaults.idleThresholdMinutes
+        ptoReducesWeeklyLimit = try container.decodeIfPresent(Bool.self, forKey: .ptoReducesWeeklyLimit)
+            ?? defaults.ptoReducesWeeklyLimit
+        ptoDayMinutes = try container.decodeIfPresent(Int.self, forKey: .ptoDayMinutes)
+            ?? defaults.ptoDayMinutes
     }
 }
 
@@ -102,8 +112,8 @@ enum TimeSummary {
             anchor: calendar.startOfDay(for: now),
             component: .day,
             count: count,
-            limitMinutes: limitMinutes,
             calendar: calendar,
+            limitFor: { _ in limitMinutes },
             isPTO: { ptoDays.contains(dayKey($0, calendar: calendar)) }
         )
     }
@@ -114,6 +124,8 @@ enum TimeSummary {
         limitMinutes: Int,
         count: Int,
         ptoDays: Set<String> = [],
+        ptoDayMinutes: Int = 0,
+        reducesLimitForPTO: Bool = false,
         calendar: Calendar = .current
     ) -> [PeriodTotal] {
         series(
@@ -121,10 +133,37 @@ enum TimeSummary {
             anchor: calendar.dateInterval(of: .weekOfYear, for: now)!.start,
             component: .weekOfYear,
             count: count,
-            limitMinutes: limitMinutes,
             calendar: calendar,
+            limitFor: { weekStart in
+                weeklyLimit(
+                    base: limitMinutes,
+                    weekStart: weekStart,
+                    ptoDays: ptoDays,
+                    ptoDayMinutes: ptoDayMinutes,
+                    enabled: reducesLimitForPTO,
+                    calendar: calendar
+                )
+            },
             isPTO: { weekIsPTO(weekStart: $0, ptoDays: ptoDays, calendar: calendar) }
         )
+    }
+
+    /// Weekday PTO lowers the weekly ceiling. Weekends do not, since they are not work days.
+    static func weeklyLimit(
+        base: Int,
+        weekStart: Date,
+        ptoDays: Set<String>,
+        ptoDayMinutes: Int,
+        enabled: Bool,
+        calendar: Calendar = .current
+    ) -> Int {
+        guard enabled, ptoDayMinutes > 0, !ptoDays.isEmpty else { return base }
+
+        let ptoWorkdays = (0..<7)
+            .compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
+            .filter { !calendar.isDateInWeekend($0) && ptoDays.contains(dayKey($0, calendar: calendar)) }
+
+        return max(0, base - ptoWorkdays.count * ptoDayMinutes)
     }
 
     /// Calendar day identity, so a marked day cannot drift with time zone or daylight saving changes.
@@ -154,8 +193,8 @@ enum TimeSummary {
             anchor: anchor,
             component: .day,
             count: 7,
-            limitMinutes: limitMinutes,
             calendar: calendar,
+            limitFor: { _ in limitMinutes },
             isPTO: { ptoDays.contains(dayKey($0, calendar: calendar)) }
         )
     }
@@ -220,8 +259,8 @@ enum TimeSummary {
         anchor: Date,
         component: Calendar.Component,
         count: Int,
-        limitMinutes: Int,
         calendar: Calendar,
+        limitFor: (Date) -> Int,
         isPTO: (Date) -> Bool
     ) -> [PeriodTotal] {
         var minutesByStart: [Date: Int] = [:]
@@ -235,7 +274,7 @@ enum TimeSummary {
             return PeriodTotal(
                 start: start,
                 minutes: minutesByStart[start] ?? 0,
-                limitMinutes: limitMinutes,
+                limitMinutes: limitFor(start),
                 isPTO: isPTO(start)
             )
         }

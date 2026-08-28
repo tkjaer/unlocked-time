@@ -25,8 +25,13 @@ chevron by the title steps back up, and closing the panel returns it to the top 
 Right-click a day or week in the history list to mark it as PTO, or to clear the mark. Marking a
 week marks all seven of its days, and a week shows as PTO only when every day is marked.
 
-PTO is a label. It does not change any total or limit, and time tracked on a PTO day is still
-counted. It exists so a day off can be told apart from a day that simply went untracked.
+PTO is a label by default. It does not change any total, and time tracked on a PTO day is still
+counted.
+
+With **PTO reduces weekly maximum** on, each PTO weekday lowers that week's maximum by the
+configured **PTO day value**, so a week with a day off is judged against a smaller ceiling
+instead of looking artificially under. Weekend days never reduce it, and the result never drops
+below zero.
 
 ## Tracking
 
@@ -45,6 +50,9 @@ one-minute heartbeat.
 ## Settings
 
 Set the daily and weekly maximum with separate hour and minute adjusters, in 5-minute steps.
+
+**PTO reduces weekly maximum** lowers a week's ceiling for each PTO weekday, by the **PTO day
+value**. Off by default.
 
 **Pause when idle** turns idle detection on or off, and **Idle after** sets the threshold in
 minutes. Idle pausing defaults to on with a 10-minute threshold.
