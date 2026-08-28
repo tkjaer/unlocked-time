@@ -29,7 +29,7 @@ one-minute heartbeat.
 
 ## Settings
 
-Set the daily and weekly maximum in 15-minute steps.
+Set the daily and weekly maximum with separate hour and minute adjusters, in 5-minute steps.
 
 **Pause when idle** turns idle detection on or off, and **Idle after** sets the threshold in
 minutes. Idle pausing defaults to on with a 10-minute threshold.
