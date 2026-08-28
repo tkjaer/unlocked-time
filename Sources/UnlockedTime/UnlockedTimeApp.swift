@@ -29,6 +29,12 @@ struct UnlockedTimeApp: App {
         }
         .menuBarExtraStyle(.window)
 
+        Window("History", id: "history") {
+            HistoryWindowView(controller: controller)
+        }
+        .defaultSize(width: 900, height: 600)
+        .windowResizability(.contentSize)
+
         Settings {
             SettingsView(controller: controller)
         }
@@ -56,7 +62,8 @@ private struct MenuBarLabel: View {
 private struct DashboardView: View {
     @ObservedObject var controller: TrackingController
     @Environment(\.openSettings) private var openSettings
-    @State private var historyPeriod = HistoryPeriod.days
+    @Environment(\.openWindow) private var openWindow
+    @State private var trendPeriod = HistoryPeriod.days
 
     private var today: PeriodTotal {
         TimeSummary.dailySeries(
@@ -76,14 +83,14 @@ private struct DashboardView: View {
         )[0]
     }
 
-    private var series: [PeriodTotal] {
-        switch historyPeriod {
+    private var trendSeries: [PeriodTotal] {
+        switch trendPeriod {
         case .days:
             TimeSummary.dailySeries(
                 sessions: controller.sessions,
                 now: controller.now,
                 limitMinutes: controller.settings.dailyLimitMinutes,
-                count: historyPeriod.count,
+                count: HistoryPeriod.days.count,
                 ptoDays: controller.ptoDays
             )
         case .weeks:
@@ -91,7 +98,7 @@ private struct DashboardView: View {
                 sessions: controller.sessions,
                 now: controller.now,
                 limitMinutes: controller.settings.weeklyLimitMinutes,
-                count: historyPeriod.count,
+                count: HistoryPeriod.weeks.count,
                 ptoDays: controller.ptoDays
             )
         }
@@ -132,30 +139,18 @@ private struct DashboardView: View {
                 }
 
                 TrendCard(
-                    series: series,
-                    period: historyPeriod,
-                    selection: $historyPeriod
+                    series: trendSeries,
+                    period: trendPeriod,
+                    selection: $trendPeriod
                 )
 
-                HistoryCard(
-                    rows: series.reversed(),
-                    period: historyPeriod,
-                    hasSessions: !controller.sessions.isEmpty,
-                    onTogglePTO: { total in
-                        switch historyPeriod {
-                        case .days:
-                            controller.setPTO(!total.isPTO, forDay: total.start)
-                        case .weeks:
-                            controller.setPTO(!total.isPTO, forWeekContaining: total.start)
-                        }
-                    }
-                )
+                Spacer(minLength: 0)
             }
             .padding(14)
 
             footer
         }
-        .frame(width: 400)
+        .frame(width: 400, height: 470)
     }
 
     private var header: some View {
@@ -220,6 +215,12 @@ private struct DashboardView: View {
             Divider()
 
             HStack {
+                Button {
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    openWindow(id: "history")
+                } label: {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }
                 Button {
                     NSApplication.shared.activate(ignoringOtherApps: true)
                     openSettings()
@@ -296,10 +297,13 @@ private struct StatCard: View {
     }
 }
 
-private struct TrendCard: View {
+struct TrendCard: View {
     let series: [PeriodTotal]
     let period: HistoryPeriod
     @Binding var selection: HistoryPeriod
+    var showsPicker = true
+    var selectedStart: Date?
+    var onSelect: ((Date) -> Void)?
 
     private var limitMinutes: Int { series.first?.limitMinutes ?? 0 }
 
@@ -313,15 +317,17 @@ private struct TrendCard: View {
                 Text("Trend")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Picker("Period", selection: $selection) {
-                    ForEach(HistoryPeriod.allCases) { value in
-                        Text(value.title).tag(value)
+                if showsPicker {
+                    Picker("Period", selection: $selection) {
+                        ForEach(HistoryPeriod.allCases) { value in
+                            Text(value.title).tag(value)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .frame(width: 124)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(width: 124)
             }
 
             Chart {
@@ -338,6 +344,17 @@ private struct TrendCard: View {
                 RuleMark(y: .value("Limit", Double(limitMinutes)))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .foregroundStyle(Color.secondary.opacity(0.55))
+
+                ForEach(series.filter { $0.isPTO && $0.minutes == 0 }) { total in
+                    BarMark(
+                        x: .value("Period", total.start, unit: period.chartUnit),
+                        yStart: .value("From", 0.0),
+                        yEnd: .value("To", max(upperBound, 60) * 0.04),
+                        width: .ratio(0.55)
+                    )
+                    .cornerRadius(2)
+                    .foregroundStyle(Color.secondary.opacity(0.45))
+                }
             }
             .chartYScale(domain: 0...max(upperBound, 60))
             .chartYAxis {
@@ -364,8 +381,20 @@ private struct TrendCard: View {
                 }
             }
             .frame(height: 112)
+            .chartOverlay { proxy in
+                if onSelect != nil {
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .onTapGesture(coordinateSpace: .local) { location in
+                                selectPeriod(at: location, proxy: proxy, geometry: geometry)
+                            }
+                    }
+                }
+            }
 
-            Text("Dashed line marks the \(formatMinutes(limitMinutes)) \(period == .days ? "daily" : "weekly") limit.")
+            Text(caption)
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
         }
@@ -373,75 +402,69 @@ private struct TrendCard: View {
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    private var caption: String {
+        let limit = "Dashed line marks the \(formatMinutes(limitMinutes)) \(period == .days ? "daily" : "weekly") limit."
+        return series.contains(where: \.isPTO) ? limit + " Grey marks PTO." : limit
+    }
+
     private func barStyle(for total: PeriodTotal) -> AnyShapeStyle {
-        if total.isOver {
-            return AnyShapeStyle(Color.red.gradient)
+        let base = total.isOver ? Color.red : Color.accentColor
+        return AnyShapeStyle(base.opacity(isHighlighted(total) ? 1 : 0.4).gradient)
+    }
+
+    /// Matched by calendar period rather than exact instant, so a selection cannot miss by seconds.
+    private func isHighlighted(_ total: PeriodTotal) -> Bool {
+        guard let selectedStart else {
+            return total.start == series.last?.start
         }
-        let isCurrent = total.start == series.last?.start
-        return AnyShapeStyle(Color.accentColor.opacity(isCurrent ? 1 : 0.45).gradient)
+        return Calendar.current.isDate(
+            total.start,
+            equalTo: selectedStart,
+            toGranularity: period == .days ? .day : .weekOfYear
+        )
+    }
+
+    private func selectPeriod(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrame = proxy.plotFrame else { return }
+        let x = location.x - geometry[plotFrame].origin.x
+        guard let tapped: Date = proxy.value(atX: x) else { return }
+        let nearest = series.min {
+            abs($0.start.timeIntervalSince(tapped)) < abs($1.start.timeIntervalSince(tapped))
+        }
+        if let nearest {
+            onSelect?(nearest.start)
+        }
     }
 }
 
-private struct HistoryCard: View {
-    let rows: [PeriodTotal]
-    let period: HistoryPeriod
-    let hasSessions: Bool
-    let onTogglePTO: (PeriodTotal) -> Void
-
-    private var peak: Int { rows.map(\.minutes).max() ?? 0 }
+struct IntervalRow: View {
+    let interval: WorkInterval
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(period.historyTitle)
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
-                Text("Right-click to mark PTO")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-            }
+        HStack(spacing: 8) {
+            Text(interval.start.formatted(date: .omitted, time: .shortened))
+                .monospacedDigit()
+            Text("–")
+                .foregroundStyle(.secondary)
+            Text(interval.end.formatted(date: .omitted, time: .shortened))
+                .monospacedDigit()
 
-            if hasSessions {
-                VStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, total in
-                        HistoryRow(total: total, period: period, isCurrent: index == 0, peak: peak)
-                            .contentShape(Rectangle())
-                            .contextMenu {
-                                Button(period.ptoActionTitle(isPTO: total.isPTO)) {
-                                    onTogglePTO(total)
-                                }
-                            }
-                        if total.id != rows.last?.id {
-                            Divider().opacity(0.4)
-                        }
-                    }
-                }
-            } else {
-                Text("No history yet. Tracking starts while the screen is unlocked.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 12)
-            }
+            Spacer()
+
+            Text(formatMinutes(interval.minutes))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
         }
-        .padding(11)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+        .font(.system(size: 11))
+        .padding(.vertical, 6)
     }
 }
 
-private struct HistoryRow: View {
+struct HistoryRow: View {
     let total: PeriodTotal
     let period: HistoryPeriod
     let isCurrent: Bool
-    let peak: Int
-
-    /// Bars scale to the largest value in view so periods above the limit stay comparable.
-    private var fraction: Double {
-        guard peak > 0 else { return 0 }
-        return min(Double(total.minutes) / Double(peak), 1)
-    }
-
-    private var barWidth: CGFloat { 104 }
+    var isSelected = false
 
     private var valueStyle: AnyShapeStyle {
         if total.minutes == 0 {
@@ -451,21 +474,11 @@ private struct HistoryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Text(period.label(for: total.start))
                 .font(.system(size: 11, weight: isCurrent ? .semibold : .regular))
                 .monospacedDigit()
                 .lineLimit(1)
-                .frame(width: period.labelWidth, alignment: .leading)
-
-            if isCurrent {
-                Text(period.currentBadge)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.accentColor.opacity(0.15), in: Capsule())
-            }
 
             if total.isPTO {
                 Text("PTO")
@@ -476,37 +489,29 @@ private struct HistoryRow: View {
                     .background(Color.secondary.opacity(0.15), in: Capsule())
             }
 
-            Spacer(minLength: 6)
-
-            ZStack(alignment: .leading) {
-                if total.minutes > 0 {
-                    Capsule().fill(.quaternary)
-                    Capsule()
-                        .fill(total.isOver ? Color.red : Color.accentColor.opacity(isCurrent ? 0.9 : 0.5))
-                        .frame(width: max(barWidth * fraction, 4))
-                }
-            }
-            .frame(width: barWidth, height: 4)
+            Spacer(minLength: 4)
 
             Text(formatMinutes(total.minutes))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(valueStyle)
-                .frame(width: 56, alignment: .trailing)
         }
+        .padding(.horizontal, 6)
         .padding(.vertical, 5)
+        .background(
+            isSelected ? Color.accentColor.opacity(0.15) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 5)
+        )
     }
 }
 
-private enum HistoryPeriod: String, CaseIterable, Identifiable {
+enum HistoryPeriod: String, CaseIterable, Identifiable {
     case days
     case weeks
 
     var id: String { rawValue }
     var title: String { self == .days ? "Days" : "Weeks" }
-    var historyTitle: String { self == .days ? "Last 7 days" : "Last 8 weeks" }
-    var currentBadge: String { self == .days ? "Today" : "This week" }
+    var historyTitle: String { self == .days ? "All days" : "All weeks" }
     var count: Int { self == .days ? 7 : 8 }
-    var labelWidth: CGFloat { self == .days ? 78 : 64 }
     var chartUnit: Calendar.Component { self == .days ? .day : .weekOfYear }
 
     func label(for date: Date) -> String {

@@ -14,6 +14,12 @@ weekly totals against limits you set.
 - Which days or weeks are marked as PTO.
 - Manual pause and resume.
 
+## History
+
+The list starts on the last 7 days or the last 8 weeks. Clicking a week opens that week's days,
+and clicking a day opens the individual sessions worked that day, with start and end times. The
+chevron by the title steps back up, and closing the panel returns it to the top level.
+
 ## PTO
 
 Right-click a day or week in the history list to mark it as PTO, or to clear the mark. Marking a
