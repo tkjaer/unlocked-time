@@ -1,10 +1,35 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+struct WorkLogDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+
+    var text: String
+
+    init(text: String) {
+        self.text = text
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        text = String(decoding: data, as: UTF8.self)
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
+}
 
 struct HistoryWindowView: View {
     @ObservedObject var controller: TrackingController
     @State private var period = HistoryPeriod.days
     @State private var selectedWeek: Date?
     @State private var selectedDay: Date? = Calendar.current.startOfDay(for: Date())
+    @State private var isExporting = false
+    @State private var exportDocument = WorkLogDocument(text: "")
+    @State private var exportError: String?
 
     private let columnHeight: CGFloat = 336
 
@@ -177,6 +202,13 @@ struct HistoryWindowView: View {
 
             Spacer()
 
+            Button {
+                exportDocument = WorkLogDocument(text: controller.exportText())
+                isExporting = true
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+
             Picker("Period", selection: $period) {
                 ForEach(HistoryPeriod.allCases) { value in
                     Text(value.title).tag(value)
@@ -188,6 +220,21 @@ struct HistoryWindowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .fileExporter(
+            isPresented: $isExporting,
+            document: exportDocument,
+            contentType: .plainText,
+            defaultFilename: "unlocked-time"
+        ) { result in
+            if case .failure(let error) = result {
+                exportError = error.localizedDescription
+            }
+        }
+        .alert("Export failed", isPresented: .constant(exportError != nil)) {
+            Button("OK") { exportError = nil }
+        } message: {
+            Text(exportError ?? "")
+        }
     }
 
     private var sessionsColumn: some View {

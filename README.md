@@ -64,12 +64,17 @@ without opening it manually.
 
 ```text
 2026-08-17 08:20-14:30+16:00-23:30
-2026-08-18 07:45-16:15
+2026-08-19 PTO
+2026-08-20 PTO 09:00-11:00
 ```
 
-One date per line, with intervals joined by `+`. Blank lines and lines starting with `#` are
-ignored, and open intervals are rejected. Exact duplicates are skipped, so importing the same
-file twice is safe.
+One date per line, with intervals joined by `+` and an optional leading `PTO` marker. Blank
+lines and lines starting with `#` are ignored, and open intervals are rejected. A session
+running to midnight ends at `24:00`. Exact duplicates are skipped, so importing the same file
+twice is safe.
+
+**Export** in the History window writes this same format, so exports can be re-imported. Times
+are written to the minute, and a session in progress is written up to the current time.
 
 History and settings are stored locally:
 

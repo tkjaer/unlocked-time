@@ -36,6 +36,15 @@ struct TimeStoreTests {
         #expect(data.ptoDays.isEmpty)
     }
 
+    @Test func resumesOnlyAfterAShortBreak() {
+        let end = Date(timeIntervalSince1970: 10_000)
+
+        #expect(TrackingController.canResume(lastEnd: end, now: end.addingTimeInterval(30)))
+        #expect(TrackingController.canResume(lastEnd: end, now: end.addingTimeInterval(120)))
+        #expect(!TrackingController.canResume(lastEnd: end, now: end.addingTimeInterval(121)))
+        #expect(!TrackingController.canResume(lastEnd: end, now: end.addingTimeInterval(-5)))
+    }
+
     @Test func missingStoreStartsEmpty() throws {
         let url = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString)

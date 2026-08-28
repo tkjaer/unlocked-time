@@ -13,7 +13,7 @@ struct WorkLogImporterTests {
         2026-08-18 07:45-16:15
         """
 
-        let sessions = try WorkLogImporter.parse(text, calendar: calendar)
+        let sessions = try WorkLogImporter.parse(text, calendar: calendar).sessions
 
         #expect(sessions.count == 3)
         #expect(sessions.map { Int($0.end!.timeIntervalSince($0.start) / 60) } == [370, 450, 510])
@@ -26,7 +26,7 @@ struct WorkLogImporterTests {
     }
 
     @Test func mergingTwiceSkipsDuplicatesAndPreservesOpenSession() throws {
-        let imported = try WorkLogImporter.parse("2026-08-28 08:00-09:00")
+        let imported = try WorkLogImporter.parse("2026-08-28 08:00-09:00").sessions
         let open = WorkSession(start: Date())
 
         let first = WorkLogImporter.merge(imported, into: [open])
