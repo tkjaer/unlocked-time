@@ -18,6 +18,11 @@ weekly totals against limits you set.
 A session runs while the app is open and the screen is unlocked. It stops when the screen locks,
 the display sleeps, or the user session becomes inactive, and resumes on unlock or wake.
 
+With **Pause when idle** on, a session also stops after the configured number of minutes without
+keyboard or mouse input. The stop is backdated to the last input, so the idle stretch is never
+counted, and tracking resumes as soon as you use the Mac again. Idle is measured from input
+alone, so watching a video counts as idle.
+
 The app only observes these events while it is running. It cannot reconstruct activity from
 periods when it was closed. After an unexpected exit, an open session is closed at its last
 one-minute heartbeat.
@@ -25,6 +30,9 @@ one-minute heartbeat.
 ## Settings
 
 Set the daily and weekly maximum in 15-minute steps.
+
+**Pause when idle** turns idle detection on or off, and **Idle after** sets the threshold in
+minutes. Idle pausing defaults to on with a 10-minute threshold.
 
 **Start at login** registers the app as a login item, so tracking resumes after a restart
 without opening it manually.

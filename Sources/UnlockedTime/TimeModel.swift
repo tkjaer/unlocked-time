@@ -13,8 +13,36 @@ struct WorkSession: Codable, Identifiable, Equatable, Sendable {
 }
 
 struct TrackingSettings: Codable, Equatable, Sendable {
-    var dailyLimitMinutes = 8 * 60
-    var weeklyLimitMinutes = 40 * 60
+    var dailyLimitMinutes: Int
+    var weeklyLimitMinutes: Int
+    var pausesWhenIdle: Bool
+    var idleThresholdMinutes: Int
+
+    init(
+        dailyLimitMinutes: Int = 8 * 60,
+        weeklyLimitMinutes: Int = 40 * 60,
+        pausesWhenIdle: Bool = true,
+        idleThresholdMinutes: Int = 10
+    ) {
+        self.dailyLimitMinutes = dailyLimitMinutes
+        self.weeklyLimitMinutes = weeklyLimitMinutes
+        self.pausesWhenIdle = pausesWhenIdle
+        self.idleThresholdMinutes = idleThresholdMinutes
+    }
+
+    /// Files written before a field existed must still load, so every key falls back to its default.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = TrackingSettings()
+        dailyLimitMinutes = try container.decodeIfPresent(Int.self, forKey: .dailyLimitMinutes)
+            ?? defaults.dailyLimitMinutes
+        weeklyLimitMinutes = try container.decodeIfPresent(Int.self, forKey: .weeklyLimitMinutes)
+            ?? defaults.weeklyLimitMinutes
+        pausesWhenIdle = try container.decodeIfPresent(Bool.self, forKey: .pausesWhenIdle)
+            ?? defaults.pausesWhenIdle
+        idleThresholdMinutes = try container.decodeIfPresent(Int.self, forKey: .idleThresholdMinutes)
+            ?? defaults.idleThresholdMinutes
+    }
 }
 
 struct PeriodTotal: Identifiable, Equatable, Sendable {
