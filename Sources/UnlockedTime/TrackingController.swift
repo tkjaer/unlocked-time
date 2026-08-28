@@ -28,7 +28,7 @@ final class TrackingController: ObservableObject {
         installObservers()
 
         if !Self.screenIsLocked {
-            startSession(at: now)
+            resumeOrStart(at: now)
         }
 
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
@@ -98,6 +98,29 @@ final class TrackingController: ObservableObject {
         persist()
     }
 
+    /// Restarting the app should not split a stretch of work into separate sessions.
+    private func resumeOrStart(at date: Date) {
+        guard
+            let index = data.sessions.indices.last,
+            let end = data.sessions[index].end,
+            Self.canResume(lastEnd: end, now: date)
+        else {
+            startSession(at: date)
+            return
+        }
+
+        data.sessions[index].end = nil
+        data.lastHeartbeat = date
+        now = date
+        pausedByIdle = false
+        persist()
+    }
+
+    nonisolated static func canResume(lastEnd: Date, now: Date, grace: TimeInterval = 120) -> Bool {
+        let gap = now.timeIntervalSince(lastEnd)
+        return gap >= 0 && gap <= grace
+    }
+
     func stopSession(at date: Date = Date()) {
         guard let index = data.sessions.lastIndex(where: { $0.end == nil }) else { return }
         data.sessions[index].end = max(data.sessions[index].start, date)
@@ -136,11 +159,16 @@ final class TrackingController: ObservableObject {
 
     @discardableResult
     func importFile(at url: URL) throws -> ImportResult {
-        let imported = try WorkLogImporter.parse(String(contentsOf: url, encoding: .utf8))
-        let merged = WorkLogImporter.merge(imported, into: data.sessions)
+        let parsed = try WorkLogImporter.parse(String(contentsOf: url, encoding: .utf8))
+        let merged = WorkLogImporter.merge(parsed.sessions, into: data.sessions)
         data.sessions = merged.0
+        data.ptoDays.formUnion(parsed.ptoDays)
         persist()
         return merged.1
+    }
+
+    func exportText() -> String {
+        WorkLogExporter.text(sessions: data.sessions, ptoDays: data.ptoDays, now: now)
     }
 
     private func recoverOpenSession(at date: Date) {
@@ -189,6 +217,14 @@ final class TrackingController: ObservableObject {
 
     private func installObservers() {
         let center = NSWorkspace.shared.notificationCenter
+
+        workspaceObservers.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stopSession() }
+        })
         for name in [
             NSWorkspace.screensDidSleepNotification,
             NSWorkspace.sessionDidResignActiveNotification
