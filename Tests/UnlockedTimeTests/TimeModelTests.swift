@@ -148,6 +148,43 @@ struct TimeModelTests {
         #expect(!partial[0].isPTO)
     }
 
+    @Test func listsIntervalsClippedToTheDay() {
+        let sessions = [
+            WorkSession(start: date(2026, 8, 26, 23, 0), end: date(2026, 8, 27, 1, 30)),
+            WorkSession(start: date(2026, 8, 27, 9, 0), end: date(2026, 8, 27, 11, 15)),
+            WorkSession(start: date(2026, 8, 28, 8, 0), end: date(2026, 8, 28, 9, 0))
+        ]
+
+        let intervals = TimeSummary.intervals(
+            sessions: sessions,
+            on: date(2026, 8, 27),
+            now: date(2026, 8, 28, 12),
+            calendar: calendar
+        )
+
+        #expect(intervals.count == 2)
+        #expect(intervals[0].start == date(2026, 8, 27))
+        #expect(intervals[0].end == date(2026, 8, 27, 1, 30))
+        #expect(intervals.map(\.minutes) == [90, 135])
+    }
+
+    @Test func listsSevenDaysOfAGivenWeek() {
+        let sessions = [WorkSession(start: date(2026, 8, 25, 8), end: date(2026, 8, 25, 10))]
+
+        let days = TimeSummary.daysInWeek(
+            sessions: sessions,
+            weekStart: date(2026, 8, 24),
+            now: date(2026, 8, 28, 12),
+            limitMinutes: 8 * 60,
+            calendar: calendar
+        )
+
+        #expect(days.count == 7)
+        #expect(days.first?.start == date(2026, 8, 24))
+        #expect(days.last?.start == date(2026, 8, 30))
+        #expect(days[1].minutes == 120)
+    }
+
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: year,

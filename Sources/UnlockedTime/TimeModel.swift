@@ -57,6 +57,14 @@ struct PeriodTotal: Identifiable, Equatable, Sendable {
     var isOver: Bool { minutes > limitMinutes }
 }
 
+struct WorkInterval: Identifiable, Equatable, Sendable {
+    let start: Date
+    let end: Date
+
+    var id: Date { start }
+    var minutes: Int { Int(end.timeIntervalSince(start) / 60) }
+}
+
 enum TimeSummary {
     static func dailyTotals(
         sessions: [WorkSession],
@@ -123,6 +131,44 @@ enum TimeSummary {
     static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// The seven days of the week containing `weekStart`, oldest first.
+    static func daysInWeek(
+        sessions: [WorkSession],
+        weekStart: Date,
+        now: Date,
+        limitMinutes: Int,
+        ptoDays: Set<String> = [],
+        calendar: Calendar = .current
+    ) -> [PeriodTotal] {
+        let anchor = calendar.date(byAdding: .day, value: 6, to: weekStart)!
+        return series(
+            totals: dailyTotals(sessions: sessions, now: now, limitMinutes: limitMinutes, calendar: calendar),
+            anchor: anchor,
+            component: .day,
+            count: 7,
+            limitMinutes: limitMinutes,
+            calendar: calendar,
+            isPTO: { ptoDays.contains(dayKey($0, calendar: calendar)) }
+        )
+    }
+
+    /// Worked stretches on a single day, clipped to that day and ordered.
+    static func intervals(
+        sessions: [WorkSession],
+        on day: Date,
+        now: Date,
+        calendar: Calendar = .current
+    ) -> [WorkInterval] {
+        let dayStart = calendar.startOfDay(for: day)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart)!
+
+        return sessions.compactMap { session in
+            let start = max(session.start, dayStart)
+            let end = min(session.end ?? now, dayEnd)
+            return end > start ? WorkInterval(start: start, end: end) : nil
+        }.sorted { $0.start < $1.start }
     }
 
     static func weekIsPTO(weekStart: Date, ptoDays: Set<String>, calendar: Calendar = .current) -> Bool {
