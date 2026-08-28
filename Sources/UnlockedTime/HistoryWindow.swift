@@ -30,6 +30,7 @@ struct HistoryWindowView: View {
     @State private var isExporting = false
     @State private var exportDocument = WorkLogDocument(text: "")
     @State private var exportError: String?
+    @State private var editing: SessionDraft?
 
     private let columnHeight: CGFloat = 336
 
@@ -188,6 +189,18 @@ struct HistoryWindowView: View {
             .padding(16)
         }
         .frame(width: 880, height: 640)
+        .sheet(item: $editing) { draft in
+            SessionEditor(draft: draft) { start, end in
+                if let id = draft.sessionID {
+                    controller.updateSession(id: id, start: start, end: end)
+                } else {
+                    controller.addSession(start: start, end: end)
+                }
+                editing = nil
+            } onCancel: {
+                editing = nil
+            }
+        }
     }
 
     private var header: some View {
@@ -195,7 +208,7 @@ struct HistoryWindowView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("History")
                     .font(.system(size: 15, weight: .semibold))
-                Text("Click a week to see its days, then a day to see its sessions.")
+                Text("Click a week for its days, then a day for its sessions. Double-click a session to edit it.")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -242,7 +255,20 @@ struct HistoryWindowView: View {
             title: selectedDay.map { HistoryPeriod.days.label(for: $0) } ?? "Sessions",
             total: selectedDay == nil ? nil : intervals.reduce(0) { $0 + $1.minutes },
             width: 264,
-            height: columnHeight
+            height: columnHeight,
+            accessory: selectedDay.map { day in
+                AnyView(
+                    Button {
+                        editing = SessionDraft(day: day)
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                    .help("Add a session")
+                )
+            }
         ) {
             if selectedDay == nil {
                 columnHint("Select a day to see its sessions.")
@@ -251,6 +277,23 @@ struct HistoryWindowView: View {
             } else {
                 ForEach(intervals) { interval in
                     IntervalRow(interval: interval)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            guard !interval.isOpen else { return }
+                            editing = SessionDraft(interval: interval)
+                        }
+                        .contextMenu {
+                            if interval.isOpen {
+                                Text("Running now")
+                            } else {
+                                Button("Edit…") {
+                                    editing = SessionDraft(interval: interval)
+                                }
+                                Button("Delete", role: .destructive) {
+                                    controller.deleteSession(id: interval.sessionID)
+                                }
+                            }
+                        }
                     if interval.id != intervals.last?.id {
                         Divider().opacity(0.3)
                     }
@@ -331,11 +374,12 @@ private struct HistoryColumn<Content: View>: View {
     var total: Int?
     let width: CGFloat
     let height: CGFloat
+    var accessory: AnyView?
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
@@ -347,6 +391,8 @@ private struct HistoryColumn<Content: View>: View {
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+
+                accessory
             }
             .padding(.horizontal, 11)
             .padding(.top, 10)

@@ -294,6 +294,29 @@ struct TimeModelTests {
         #expect(TimeSummary.overage(totals).isClean)
     }
 
+    @Test func intervalsCarrySessionIdentityAndOpenState() {
+        let closed = WorkSession(start: date(2026, 8, 27, 9), end: date(2026, 8, 27, 11))
+        let open = WorkSession(start: date(2026, 8, 27, 13))
+
+        let intervals = TimeSummary.intervals(
+            sessions: [closed, open],
+            on: date(2026, 8, 27),
+            now: date(2026, 8, 27, 14),
+            calendar: calendar
+        )
+
+        #expect(intervals.map(\.sessionID) == [closed.id, open.id])
+        #expect(intervals.map(\.isOpen) == [false, true])
+    }
+
+    @Test func anEditNeedsAnEndAfterTheStart() {
+        let start = date(2026, 8, 27, 9)
+
+        #expect(SessionEdit.normalise(start: start, end: date(2026, 8, 27, 10)) != nil)
+        #expect(SessionEdit.normalise(start: start, end: start) == nil)
+        #expect(SessionEdit.normalise(start: start, end: date(2026, 8, 27, 8)) == nil)
+    }
+
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: year,
