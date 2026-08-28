@@ -261,6 +261,18 @@ struct TimeModelTests {
         #expect(series[0].limitMinutes == 40 * 60 - 450)
     }
 
+    @Test func aLimitIsAnnouncedOncePerPeriod() {
+        #expect(LimitCheck.reached(minutes: 480, limit: 480, key: "2026-08-28", lastNotified: nil))
+        #expect(LimitCheck.reached(minutes: 600, limit: 480, key: "2026-08-28", lastNotified: "2026-08-27"))
+        #expect(!LimitCheck.reached(minutes: 600, limit: 480, key: "2026-08-28", lastNotified: "2026-08-28"))
+        #expect(!LimitCheck.reached(minutes: 479, limit: 480, key: "2026-08-28", lastNotified: nil))
+        #expect(!LimitCheck.reached(minutes: 10, limit: 0, key: "2026-08-28", lastNotified: nil))
+    }
+
+    @Test func weekKeyUsesTheISOWeek() {
+        #expect(TimeSummary.weekKey(date(2026, 8, 28), calendar: calendar) == "2026-W35")
+    }
+
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: year,

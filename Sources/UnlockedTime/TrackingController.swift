@@ -36,6 +36,10 @@ final class TrackingController: ObservableObject {
                 self?.heartbeat()
             }
         }
+
+        if data.settings.notifiesOnLimit {
+            LimitNotifier.requestAuthorization()
+        }
     }
 
     convenience init() {
@@ -65,7 +69,8 @@ final class TrackingController: ObservableObject {
         pausesWhenIdle: Bool,
         idleThresholdMinutes: Int,
         ptoReducesWeeklyLimit: Bool,
-        ptoDayMinutes: Int
+        ptoDayMinutes: Int,
+        notifiesOnLimit: Bool
     ) {
         data.settings.dailyLimitMinutes = dailyLimitMinutes
         data.settings.weeklyLimitMinutes = weeklyLimitMinutes
@@ -73,6 +78,12 @@ final class TrackingController: ObservableObject {
         data.settings.idleThresholdMinutes = idleThresholdMinutes
         data.settings.ptoReducesWeeklyLimit = ptoReducesWeeklyLimit
         data.settings.ptoDayMinutes = ptoDayMinutes
+
+        if notifiesOnLimit, !data.settings.notifiesOnLimit {
+            LimitNotifier.requestAuthorization()
+        }
+        data.settings.notifiesOnLimit = notifiesOnLimit
+
         persist()
     }
 
@@ -202,6 +213,59 @@ final class TrackingController: ObservableObject {
 
         if isTracking {
             data.lastHeartbeat = current
+            persist()
+        }
+
+        checkLimits()
+    }
+
+    private func checkLimits() {
+        guard data.settings.notifiesOnLimit else { return }
+
+        let today = TimeSummary.dailySeries(
+            sessions: data.sessions,
+            now: now,
+            limitMinutes: data.settings.dailyLimitMinutes,
+            count: 1
+        )[0]
+        let dayKey = TimeSummary.dayKey(now)
+
+        if LimitCheck.reached(
+            minutes: today.minutes,
+            limit: today.limitMinutes,
+            key: dayKey,
+            lastNotified: data.notifiedDailyLimit
+        ) {
+            LimitNotifier.post(
+                title: "Daily maximum reached",
+                body: "\(formatMinutes(today.minutes)) today, against \(formatMinutes(today.limitMinutes))."
+            )
+            data.notifiedDailyLimit = dayKey
+            persist()
+        }
+
+        let week = TimeSummary.weeklySeries(
+            sessions: data.sessions,
+            now: now,
+            limitMinutes: data.settings.weeklyLimitMinutes,
+            count: 1,
+            ptoDays: data.ptoDays,
+            ptoDayMinutes: data.settings.ptoDayMinutes,
+            reducesLimitForPTO: data.settings.ptoReducesWeeklyLimit
+        )[0]
+        let weekKey = TimeSummary.weekKey(now)
+
+        if LimitCheck.reached(
+            minutes: week.minutes,
+            limit: week.limitMinutes,
+            key: weekKey,
+            lastNotified: data.notifiedWeeklyLimit
+        ) {
+            LimitNotifier.post(
+                title: "Weekly maximum reached",
+                body: "\(formatMinutes(week.minutes)) this week, against \(formatMinutes(week.limitMinutes))."
+            )
+            data.notifiedWeeklyLimit = weekKey
             persist()
         }
     }

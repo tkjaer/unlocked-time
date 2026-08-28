@@ -19,6 +19,7 @@ struct TrackingSettings: Codable, Equatable, Sendable {
     var idleThresholdMinutes: Int
     var ptoReducesWeeklyLimit: Bool
     var ptoDayMinutes: Int
+    var notifiesOnLimit: Bool
 
     init(
         dailyLimitMinutes: Int = 8 * 60,
@@ -26,7 +27,8 @@ struct TrackingSettings: Codable, Equatable, Sendable {
         pausesWhenIdle: Bool = true,
         idleThresholdMinutes: Int = 10,
         ptoReducesWeeklyLimit: Bool = false,
-        ptoDayMinutes: Int = 450
+        ptoDayMinutes: Int = 450,
+        notifiesOnLimit: Bool = true
     ) {
         self.dailyLimitMinutes = dailyLimitMinutes
         self.weeklyLimitMinutes = weeklyLimitMinutes
@@ -34,6 +36,7 @@ struct TrackingSettings: Codable, Equatable, Sendable {
         self.idleThresholdMinutes = idleThresholdMinutes
         self.ptoReducesWeeklyLimit = ptoReducesWeeklyLimit
         self.ptoDayMinutes = ptoDayMinutes
+        self.notifiesOnLimit = notifiesOnLimit
     }
 
     /// Files written before a field existed must still load, so every key falls back to its default.
@@ -52,6 +55,8 @@ struct TrackingSettings: Codable, Equatable, Sendable {
             ?? defaults.ptoReducesWeeklyLimit
         ptoDayMinutes = try container.decodeIfPresent(Int.self, forKey: .ptoDayMinutes)
             ?? defaults.ptoDayMinutes
+        notifiesOnLimit = try container.decodeIfPresent(Bool.self, forKey: .notifiesOnLimit)
+            ?? defaults.notifiesOnLimit
     }
 }
 
@@ -176,6 +181,11 @@ enum TimeSummary {
         let parts = key.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+    }
+
+    static func weekKey(_ date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.weekOfYear, .yearForWeekOfYear], from: date)
+        return String(format: "%04d-W%02d", parts.yearForWeekOfYear ?? 0, parts.weekOfYear ?? 0)
     }
 
     /// The seven days of the week containing `weekStart`, oldest first.
@@ -306,6 +316,13 @@ enum TimeSummary {
         return secondsByPeriod.map { start, seconds in
             PeriodTotal(start: start, minutes: Int(seconds / 60), limitMinutes: limitMinutes)
         }.sorted { $0.start > $1.start }
+    }
+}
+
+enum LimitCheck {
+    /// True only the first time a period reaches its limit, so a limit is announced once.
+    static func reached(minutes: Int, limit: Int, key: String, lastNotified: String?) -> Bool {
+        limit > 0 && minutes >= limit && lastNotified != key
     }
 }
 

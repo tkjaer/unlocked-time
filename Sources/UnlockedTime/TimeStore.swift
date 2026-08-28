@@ -5,17 +5,23 @@ struct StoredTimeData: Codable, Equatable, Sendable {
     var settings: TrackingSettings
     var lastHeartbeat: Date?
     var ptoDays: Set<String>
+    var notifiedDailyLimit: String?
+    var notifiedWeeklyLimit: String?
 
     init(
         sessions: [WorkSession] = [],
         settings: TrackingSettings = TrackingSettings(),
         lastHeartbeat: Date? = nil,
-        ptoDays: Set<String> = []
+        ptoDays: Set<String> = [],
+        notifiedDailyLimit: String? = nil,
+        notifiedWeeklyLimit: String? = nil
     ) {
         self.sessions = sessions
         self.settings = settings
         self.lastHeartbeat = lastHeartbeat
         self.ptoDays = ptoDays
+        self.notifiedDailyLimit = notifiedDailyLimit
+        self.notifiedWeeklyLimit = notifiedWeeklyLimit
     }
 
     /// Files written before a field existed must still load, so every key falls back to its default.
@@ -25,6 +31,8 @@ struct StoredTimeData: Codable, Equatable, Sendable {
         settings = try container.decodeIfPresent(TrackingSettings.self, forKey: .settings) ?? TrackingSettings()
         lastHeartbeat = try container.decodeIfPresent(Date.self, forKey: .lastHeartbeat)
         ptoDays = try container.decodeIfPresent(Set<String>.self, forKey: .ptoDays) ?? []
+        notifiedDailyLimit = try container.decodeIfPresent(String.self, forKey: .notifiedDailyLimit)
+        notifiedWeeklyLimit = try container.decodeIfPresent(String.self, forKey: .notifiedWeeklyLimit)
     }
 }
 
