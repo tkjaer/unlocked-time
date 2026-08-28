@@ -3,8 +3,6 @@
 A native macOS menu bar app that tracks how long your Mac is unlocked and reports daily and
 weekly totals against limits you set.
 
-Built with GitHub Copilot, from the first prototype through to the current app.
-
 ## Screenshots
 
 | Light | Dark |
@@ -144,3 +142,7 @@ swift test
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+Built with GitHub Copilot, from the first prototype through to the current app.
