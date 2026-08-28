@@ -587,6 +587,7 @@ private struct SettingsView: View {
     @State private var idleThresholdMinutes: Int
     @State private var ptoReducesWeeklyLimit: Bool
     @State private var ptoDayMinutes: Int
+    @State private var notifiesOnLimit: Bool
 
     init(controller: TrackingController) {
         self.controller = controller
@@ -596,6 +597,7 @@ private struct SettingsView: View {
         _idleThresholdMinutes = State(initialValue: controller.settings.idleThresholdMinutes)
         _ptoReducesWeeklyLimit = State(initialValue: controller.settings.ptoReducesWeeklyLimit)
         _ptoDayMinutes = State(initialValue: controller.settings.ptoDayMinutes)
+        _notifiesOnLimit = State(initialValue: controller.settings.notifiesOnLimit)
     }
 
     var body: some View {
@@ -614,6 +616,7 @@ private struct SettingsView: View {
                     LabeledContent("Idle after", value: "\(idleThresholdMinutes) min")
                 }
                 .disabled(!pausesWhenIdle)
+                Toggle("Notify when a limit is reached", isOn: $notifiesOnLimit)
             }
 
             Section("Startup") {
@@ -645,13 +648,14 @@ private struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 540)
+        .frame(width: 460, height: 570)
         .onChange(of: dailyLimitMinutes) { _, _ in save() }
         .onChange(of: weeklyLimitMinutes) { _, _ in save() }
         .onChange(of: pausesWhenIdle) { _, _ in save() }
         .onChange(of: idleThresholdMinutes) { _, _ in save() }
         .onChange(of: ptoReducesWeeklyLimit) { _, _ in save() }
         .onChange(of: ptoDayMinutes) { _, _ in save() }
+        .onChange(of: notifiesOnLimit) { _, _ in save() }
         .onChange(of: launchAtLogin) { _, isOn in
             do {
                 try LoginItem.setEnabled(isOn)
@@ -681,7 +685,8 @@ private struct SettingsView: View {
             pausesWhenIdle: pausesWhenIdle,
             idleThresholdMinutes: idleThresholdMinutes,
             ptoReducesWeeklyLimit: ptoReducesWeeklyLimit,
-            ptoDayMinutes: ptoDayMinutes
+            ptoDayMinutes: ptoDayMinutes,
+            notifiesOnLimit: notifiesOnLimit
         )
     }
 }
