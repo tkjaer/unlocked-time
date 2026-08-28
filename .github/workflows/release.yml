@@ -49,26 +49,27 @@ jobs:
     - name: Test
       run: swift test
 
-    - name: Package the app
+    - name: Check the app still packages
       run: |
         ./build-app.sh
-        ditto -c -k --keepParent "dist/Unlocked Time.app" "dist/UnlockedTime-${GITHUB_REF_NAME}.zip"
+        plutil -lint "dist/Unlocked Time.app/Contents/Info.plist"
+        codesign --verify --deep --strict "dist/Unlocked Time.app"
 
     - name: Create the release
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         cat > notes.md <<'NOTES'
-        This build is ad-hoc signed. It is not signed with a Developer ID and not notarised, so
-        macOS will refuse to open it normally.
-
-        Until that changes, build from source:
+        Build from source:
 
             ./build-app.sh
             open "dist/Unlocked Time.app"
+
+        No binary is attached. Without a Developer ID signature and notarisation macOS would
+        refuse to open one, and the only way past that is to bypass Gatekeeper, which is not
+        worth teaching. The source tarball below is the artefact.
         NOTES
         gh release create "$GITHUB_REF_NAME" \
-          "dist/UnlockedTime-${GITHUB_REF_NAME}.zip" \
           --title "$GITHUB_REF_NAME" \
           --prerelease \
           --notes-file notes.md
