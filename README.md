@@ -26,6 +26,9 @@ one-minute heartbeat.
 
 Set the daily and weekly maximum in 15-minute steps.
 
+**Start at login** registers the app as a login item, so tracking resumes after a restart
+without opening it manually.
+
 **Import work log** reads completed intervals from a plain text file:
 
 ```text

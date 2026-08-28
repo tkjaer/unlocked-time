@@ -498,6 +498,8 @@ private struct SettingsView: View {
     @State private var weeklyLimitMinutes: Int
     @State private var isImporting = false
     @State private var importMessage: String?
+    @State private var launchAtLogin = LoginItem.isEnabled
+    @State private var loginItemError: String?
 
     init(controller: TrackingController) {
         self.controller = controller
@@ -513,6 +515,15 @@ private struct SettingsView: View {
                 }
                 Stepper(value: $weeklyLimitMinutes, in: 15...(7 * 24 * 60), step: 15) {
                     LabeledContent("Weekly maximum", value: formatMinutes(weeklyLimitMinutes))
+                }
+            }
+
+            Section("Startup") {
+                Toggle("Start at login", isOn: $launchAtLogin)
+                if let loginItemError {
+                    Text(loginItemError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
 
@@ -536,9 +547,18 @@ private struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 340)
+        .frame(width: 420, height: 400)
         .onChange(of: dailyLimitMinutes) { _, _ in save() }
         .onChange(of: weeklyLimitMinutes) { _, _ in save() }
+        .onChange(of: launchAtLogin) { _, isOn in
+            do {
+                try LoginItem.setEnabled(isOn)
+                loginItemError = nil
+            } catch {
+                loginItemError = error.localizedDescription
+                launchAtLogin = LoginItem.isEnabled
+            }
+        }
         .fileImporter(isPresented: $isImporting, allowedContentTypes: [.plainText]) { result in
             do {
                 let url = try result.get()
