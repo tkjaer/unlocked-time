@@ -492,6 +492,38 @@ private enum HistoryPeriod: String, CaseIterable, Identifiable {
     }
 }
 
+private struct LimitStepper: View {
+    let title: String
+    @Binding var minutes: Int
+    let maxHours: Int
+
+    private var hoursBinding: Binding<Int> {
+        Binding(get: { minutes / 60 }, set: { minutes = $0 * 60 + minutes % 60 })
+    }
+
+    private var minutesBinding: Binding<Int> {
+        Binding(get: { minutes % 60 }, set: { minutes = (minutes / 60) * 60 + $0 })
+    }
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 12) {
+                Stepper(value: hoursBinding, in: 0...maxHours) {
+                    Text("\(minutes / 60) h")
+                        .monospacedDigit()
+                }
+                .fixedSize()
+
+                Stepper(value: minutesBinding, in: 0...55, step: 5) {
+                    Text(String(format: "%02d m", minutes % 60))
+                        .monospacedDigit()
+                }
+                .fixedSize()
+            }
+        }
+    }
+}
+
 private struct SettingsView: View {
     @ObservedObject var controller: TrackingController
     @State private var dailyLimitMinutes: Int
@@ -514,12 +546,8 @@ private struct SettingsView: View {
     var body: some View {
         Form {
             Section("Limits") {
-                Stepper(value: $dailyLimitMinutes, in: 15...(24 * 60), step: 15) {
-                    LabeledContent("Daily maximum", value: formatMinutes(dailyLimitMinutes))
-                }
-                Stepper(value: $weeklyLimitMinutes, in: 15...(7 * 24 * 60), step: 15) {
-                    LabeledContent("Weekly maximum", value: formatMinutes(weeklyLimitMinutes))
-                }
+                LimitStepper(title: "Daily maximum", minutes: $dailyLimitMinutes, maxHours: 24)
+                LimitStepper(title: "Weekly maximum", minutes: $weeklyLimitMinutes, maxHours: 7 * 24)
             }
 
             Section("Tracking") {
