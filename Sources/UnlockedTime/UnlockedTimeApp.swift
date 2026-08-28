@@ -183,6 +183,7 @@ private struct DashboardView: View {
             footer
         }
         .frame(width: 400)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var header: some View {
