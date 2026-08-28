@@ -7,7 +7,13 @@ struct UnlockedTimeApp: App {
     @StateObject private var controller: TrackingController
 
     init() {
-        let controller = TrackingController()
+        let isDemo = CommandLine.arguments.contains("--demo")
+        let controller = isDemo
+            ? TrackingController(store: (try? DemoData.store()) ?? TimeStore(
+                fileURL: FileManager.default.temporaryDirectory.appending(path: "UnlockedTime-demo.json")
+            ))
+            : TrackingController()
+
         if let optionIndex = CommandLine.arguments.firstIndex(of: "--import"),
            CommandLine.arguments.indices.contains(optionIndex + 1) {
             let path = NSString(string: CommandLine.arguments[optionIndex + 1]).expandingTildeInPath
