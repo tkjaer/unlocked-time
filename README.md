@@ -99,6 +99,14 @@ open -n "dist/Unlocked Time.app" --args --import ~/time_worked.txt
 
 The app has no Dock icon. Keep it running for tracking to continue.
 
+The app icon is generated rather than stored as an opaque asset. To change it, edit
+`Tools/make-icon.swift`, then:
+
+```sh
+swift Tools/make-icon.swift
+iconutil -c icns App/AppIcon.iconset -o App/AppIcon.icns
+```
+
 ## Tests
 
 ```sh
