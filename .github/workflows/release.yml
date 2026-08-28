@@ -1,0 +1,75 @@
+name: Release
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+
+  tag-guard:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Verify tag commit is on main
+      run: |
+        git fetch origin main:refs/remotes/origin/main
+        if git merge-base --is-ancestor "$GITHUB_SHA" "origin/main"; then
+          echo "Tag commit is on main."
+        else
+          echo "Tag commit is not on main. Refusing to release."
+          exit 1
+        fi
+
+  release:
+    needs: tag-guard
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Verify tag matches the bundle version
+      run: |
+        tag="${GITHUB_REF_NAME#v}"
+        bundle=$(plutil -extract CFBundleShortVersionString raw App/Info.plist)
+        if [ "$tag" != "$bundle" ]; then
+          echo "Tag $tag does not match CFBundleShortVersionString $bundle."
+          exit 1
+        fi
+
+    - name: Test
+      run: swift test
+
+    - name: Check the app still packages
+      run: |
+        ./build-app.sh
+        plutil -lint "dist/Unlocked Time.app/Contents/Info.plist"
+        codesign --verify --deep --strict "dist/Unlocked Time.app"
+
+    - name: Create the release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        cat > notes.md <<'NOTES'
+        Build from source:
+
+            ./build-app.sh
+            open "dist/Unlocked Time.app"
+
+        No binary is attached. Without a Developer ID signature and notarisation macOS would
+        refuse to open one, and the only way past that is to bypass Gatekeeper, which is not
+        worth teaching. The source tarball below is the artefact.
+        NOTES
+        gh release create "$GITHUB_REF_NAME" \
+          --title "$GITHUB_REF_NAME" \
+          --prerelease \
+          --notes-file notes.md

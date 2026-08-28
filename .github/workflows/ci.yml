@@ -1,0 +1,39 @@
+name: CI
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  test:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Show toolchain
+      run: swift --version
+
+    - name: Build
+      run: swift build
+
+    - name: Test
+      run: swift test
+
+    - name: Package the app
+      run: ./build-app.sh
+
+    - name: Check the bundle
+      run: |
+        plutil -lint "dist/Unlocked Time.app/Contents/Info.plist"
+        test -f "dist/Unlocked Time.app/Contents/Resources/AppIcon.icns"
+        codesign --verify --deep --strict "dist/Unlocked Time.app"
