@@ -109,6 +109,20 @@ private struct DashboardView: View {
         }
     }
 
+    private var recentOverage: OverageSummary {
+        TimeSummary.overage(
+            TimeSummary.weeklySeries(
+                sessions: controller.sessions,
+                now: controller.now,
+                limitMinutes: controller.settings.weeklyLimitMinutes,
+                count: 4,
+                ptoDays: controller.ptoDays,
+                ptoDayMinutes: controller.settings.ptoDayMinutes,
+                reducesLimitForPTO: controller.settings.ptoReducesWeeklyLimit
+            )
+        )
+    }
+
     private var weeklyLimitCrossing: Date? {
         TimeSummary.weeklyLimitCrossing(
             sessions: controller.sessions,
@@ -148,6 +162,15 @@ private struct DashboardView: View {
                     period: trendPeriod,
                     selection: $trendPeriod
                 )
+
+                HStack(spacing: 6) {
+                    Image(systemName: recentOverage.isClean ? "checkmark.circle.fill" : "sum")
+                        .font(.system(size: 9))
+                    Text(overageText)
+                        .font(.system(size: 10))
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(recentOverage.isClean ? Color.secondary : Color.red)
 
                 Spacer(minLength: 0)
             }
@@ -197,6 +220,12 @@ private struct DashboardView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+    }
+
+    private var overageText: String {
+        recentOverage.isClean
+            ? "Within the weekly limit for 4 weeks"
+            : "\(formatMinutes(recentOverage.minutes)) over across \(recentOverage.periodsOver) of the last 4 weeks"
     }
 
     private var statusText: String {
