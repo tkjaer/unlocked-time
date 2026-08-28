@@ -171,14 +171,12 @@ private struct DashboardView: View {
                     Spacer(minLength: 0)
                 }
                 .foregroundStyle(recentOverage.isClean ? Color.secondary : Color.red)
-
-                Spacer(minLength: 0)
             }
             .padding(14)
 
             footer
         }
-        .frame(width: 400, height: 470)
+        .frame(width: 400)
     }
 
     private var header: some View {
@@ -224,8 +222,8 @@ private struct DashboardView: View {
 
     private var overageText: String {
         recentOverage.isClean
-            ? "Within the weekly limit for 4 weeks"
-            : "\(formatMinutes(recentOverage.minutes)) over across \(recentOverage.periodsOver) of the last 4 weeks"
+            ? "No week over the limit in the last 4"
+            : "\(recentOverage.periodsOver) of the last 4 weeks over limit, \(formatMinutes(recentOverage.minutes)) in total"
     }
 
     private var statusText: String {
@@ -273,7 +271,7 @@ private struct DashboardView: View {
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.vertical, 12)
         }
     }
 }
@@ -367,7 +365,7 @@ struct TrendCard: View {
             Chart {
                 ForEach(series) { total in
                     BarMark(
-                        x: .value("Period", total.start, unit: period.chartUnit),
+                        x: .value("Period", period.axisLabel(for: total.start)),
                         y: .value("Minutes", Double(total.minutes)),
                         width: .ratio(0.55)
                     )
@@ -381,7 +379,7 @@ struct TrendCard: View {
 
                 ForEach(series.filter { $0.isPTO && $0.minutes == 0 }) { total in
                     BarMark(
-                        x: .value("Period", total.start, unit: period.chartUnit),
+                        x: .value("Period", period.axisLabel(for: total.start)),
                         yStart: .value("From", 0.0),
                         yEnd: .value("To", max(upperBound, 60) * 0.04),
                         width: .ratio(0.55)
@@ -404,10 +402,10 @@ struct TrendCard: View {
                 }
             }
             .chartXAxis {
-                AxisMarks(values: series.map(\.start)) { value in
+                AxisMarks { value in
                     AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(period.axisLabel(for: date))
+                        if let label = value.as(String.self) {
+                            Text(label)
                                 .font(.system(size: 9))
                                 .foregroundStyle(.secondary)
                         }
@@ -461,13 +459,18 @@ struct TrendCard: View {
     private func selectPeriod(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
         guard let plotFrame = proxy.plotFrame else { return }
         let x = location.x - geometry[plotFrame].origin.x
-        guard let tapped: Date = proxy.value(atX: x) else { return }
-        let nearest = series.min {
-            abs($0.start.timeIntervalSince(tapped)) < abs($1.start.timeIntervalSince(tapped))
+
+        // Categorical axis: resolve the tapped band, falling back to the nearest band centre.
+        if let label: String = proxy.value(atX: x),
+           let match = series.first(where: { period.axisLabel(for: $0.start) == label }) {
+            onSelect?(match.start)
+            return
         }
-        if let nearest {
-            onSelect?(nearest.start)
-        }
+
+        guard !series.isEmpty, let width = proxy.plotSize.width as CGFloat? else { return }
+        let band = width / CGFloat(series.count)
+        let index = min(max(Int(x / max(band, 1)), 0), series.count - 1)
+        onSelect?(series[index].start)
     }
 }
 

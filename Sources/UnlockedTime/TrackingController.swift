@@ -61,7 +61,7 @@ final class TrackingController: ObservableObject {
     var sessions: [WorkSession] { data.sessions }
     var settings: TrackingSettings { data.settings }
     var ptoDays: Set<String> { data.ptoDays }
-    var isTracking: Bool { data.sessions.last?.end == nil }
+    var isTracking: Bool { data.sessions.contains { $0.end == nil } }
 
     func updateSettings(
         dailyLimitMinutes: Int,
@@ -142,6 +142,25 @@ final class TrackingController: ObservableObject {
 
     func deleteSession(id: UUID) {
         data.sessions.removeAll { $0.id == id }
+        persist()
+    }
+
+    func addSession(start: Date, end: Date) {
+        guard let edit = SessionEdit.normalise(start: start, end: end) else { return }
+        data.sessions.append(WorkSession(start: edit.start, end: edit.end))
+        data.sessions.sort { $0.start < $1.start }
+        persist()
+    }
+
+    func updateSession(id: UUID, start: Date, end: Date) {
+        guard
+            let edit = SessionEdit.normalise(start: start, end: end),
+            let index = data.sessions.firstIndex(where: { $0.id == id })
+        else { return }
+
+        data.sessions[index].start = edit.start
+        data.sessions[index].end = edit.end
+        data.sessions.sort { $0.start < $1.start }
         persist()
     }
 

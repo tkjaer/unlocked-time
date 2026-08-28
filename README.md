@@ -20,6 +20,10 @@ The list starts on the last 7 days or the last 8 weeks. Clicking a week opens th
 and clicking a day opens the individual sessions worked that day, with start and end times. The
 chevron by the title steps back up, and closing the panel returns it to the top level.
 
+Sessions can be corrected: right-click one to edit or delete it, or use the plus button in the
+sessions column to add a session to the selected day. The session running now cannot be edited,
+since it has no end yet.
+
 ## PTO
 
 Right-click a day or week in the history list to mark it as PTO, or to clear the mark. Marking a

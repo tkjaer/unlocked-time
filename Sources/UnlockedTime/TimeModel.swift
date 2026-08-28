@@ -73,11 +73,19 @@ struct PeriodTotal: Identifiable, Equatable, Sendable {
 }
 
 struct WorkInterval: Identifiable, Equatable, Sendable {
+    var sessionID = UUID()
     let start: Date
     let end: Date
+    var isOpen = false
 
     var id: Date { start }
     var minutes: Int { Int(end.timeIntervalSince(start) / 60) }
+}
+
+enum SessionEdit {
+    static func normalise(start: Date, end: Date) -> (start: Date, end: Date)? {
+        end > start ? (start, end) : nil
+    }
 }
 
 enum TimeSummary {
@@ -222,7 +230,13 @@ enum TimeSummary {
         return sessions.compactMap { session in
             let start = max(session.start, dayStart)
             let end = min(session.end ?? now, dayEnd)
-            return end > start ? WorkInterval(start: start, end: end) : nil
+            guard end > start else { return nil }
+            return WorkInterval(
+                sessionID: session.id,
+                start: start,
+                end: end,
+                isOpen: session.end == nil
+            )
         }.sorted { $0.start < $1.start }
     }
 
