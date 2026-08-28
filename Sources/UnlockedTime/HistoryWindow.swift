@@ -53,7 +53,9 @@ struct HistoryWindowView: View {
                 now: controller.now,
                 limitMinutes: controller.settings.weeklyLimitMinutes,
                 count: historyCount,
-                ptoDays: controller.ptoDays
+                ptoDays: controller.ptoDays,
+                ptoDayMinutes: controller.settings.ptoDayMinutes,
+                reducesLimitForPTO: controller.settings.ptoReducesWeeklyLimit
             )
         }
     }

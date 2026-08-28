@@ -193,6 +193,74 @@ struct TimeModelTests {
         #expect(TimeSummary.date(fromDayKey: key, calendar: calendar) == day)
     }
 
+    @Test func onlyWeekdayPTOReducesTheWeeklyLimit() {
+        let keys: Set<String> = [
+            TimeSummary.dayKey(date(2026, 8, 25), calendar: calendar),
+            TimeSummary.dayKey(date(2026, 8, 29), calendar: calendar)
+        ]
+
+        let limit = TimeSummary.weeklyLimit(
+            base: 40 * 60,
+            weekStart: date(2026, 8, 24),
+            ptoDays: keys,
+            ptoDayMinutes: 450,
+            enabled: true,
+            calendar: calendar
+        )
+
+        #expect(limit == 40 * 60 - 450)
+    }
+
+    @Test func reducedWeeklyLimitStopsAtZero() {
+        let keys = Set((0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: offset, to: date(2026, 8, 24))
+                .map { TimeSummary.dayKey($0, calendar: calendar) }
+        })
+
+        let limit = TimeSummary.weeklyLimit(
+            base: 20 * 60,
+            weekStart: date(2026, 8, 24),
+            ptoDays: keys,
+            ptoDayMinutes: 8 * 60,
+            enabled: true,
+            calendar: calendar
+        )
+
+        #expect(limit == 0)
+    }
+
+    @Test func weeklyLimitIsUntouchedWhenDisabled() {
+        let keys: Set<String> = [TimeSummary.dayKey(date(2026, 8, 25), calendar: calendar)]
+
+        let limit = TimeSummary.weeklyLimit(
+            base: 40 * 60,
+            weekStart: date(2026, 8, 24),
+            ptoDays: keys,
+            ptoDayMinutes: 450,
+            enabled: false,
+            calendar: calendar
+        )
+
+        #expect(limit == 40 * 60)
+    }
+
+    @Test func weeklySeriesCarriesTheReducedLimit() {
+        let keys: Set<String> = [TimeSummary.dayKey(date(2026, 8, 25), calendar: calendar)]
+
+        let series = TimeSummary.weeklySeries(
+            sessions: [],
+            now: date(2026, 8, 28, 12),
+            limitMinutes: 40 * 60,
+            count: 1,
+            ptoDays: keys,
+            ptoDayMinutes: 450,
+            reducesLimitForPTO: true,
+            calendar: calendar
+        )
+
+        #expect(series[0].limitMinutes == 40 * 60 - 450)
+    }
+
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: year,

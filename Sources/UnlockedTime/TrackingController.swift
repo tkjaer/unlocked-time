@@ -63,13 +63,30 @@ final class TrackingController: ObservableObject {
         dailyLimitMinutes: Int,
         weeklyLimitMinutes: Int,
         pausesWhenIdle: Bool,
-        idleThresholdMinutes: Int
+        idleThresholdMinutes: Int,
+        ptoReducesWeeklyLimit: Bool,
+        ptoDayMinutes: Int
     ) {
         data.settings.dailyLimitMinutes = dailyLimitMinutes
         data.settings.weeklyLimitMinutes = weeklyLimitMinutes
         data.settings.pausesWhenIdle = pausesWhenIdle
         data.settings.idleThresholdMinutes = idleThresholdMinutes
+        data.settings.ptoReducesWeeklyLimit = ptoReducesWeeklyLimit
+        data.settings.ptoDayMinutes = ptoDayMinutes
         persist()
+    }
+
+    func weeklyLimit(for date: Date) -> Int {
+        guard let weekStart = Calendar.current.dateInterval(of: .weekOfYear, for: date)?.start else {
+            return data.settings.weeklyLimitMinutes
+        }
+        return TimeSummary.weeklyLimit(
+            base: data.settings.weeklyLimitMinutes,
+            weekStart: weekStart,
+            ptoDays: data.ptoDays,
+            ptoDayMinutes: data.settings.ptoDayMinutes,
+            enabled: data.settings.ptoReducesWeeklyLimit
+        )
     }
 
     func startSession(at date: Date = Date()) {

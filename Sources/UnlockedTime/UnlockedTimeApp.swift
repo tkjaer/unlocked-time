@@ -79,7 +79,10 @@ private struct DashboardView: View {
             sessions: controller.sessions,
             now: controller.now,
             limitMinutes: controller.settings.weeklyLimitMinutes,
-            count: 1
+            count: 1,
+            ptoDays: controller.ptoDays,
+            ptoDayMinutes: controller.settings.ptoDayMinutes,
+            reducesLimitForPTO: controller.settings.ptoReducesWeeklyLimit
         )[0]
     }
 
@@ -99,7 +102,9 @@ private struct DashboardView: View {
                 now: controller.now,
                 limitMinutes: controller.settings.weeklyLimitMinutes,
                 count: HistoryPeriod.weeks.count,
-                ptoDays: controller.ptoDays
+                ptoDays: controller.ptoDays,
+                ptoDayMinutes: controller.settings.ptoDayMinutes,
+                reducesLimitForPTO: controller.settings.ptoReducesWeeklyLimit
             )
         }
     }
@@ -108,7 +113,7 @@ private struct DashboardView: View {
         TimeSummary.weeklyLimitCrossing(
             sessions: controller.sessions,
             now: controller.now,
-            limitMinutes: controller.settings.weeklyLimitMinutes
+            limitMinutes: controller.weeklyLimit(for: controller.now)
         )
     }
 
@@ -580,6 +585,8 @@ private struct SettingsView: View {
     @State private var loginItemError: String?
     @State private var pausesWhenIdle: Bool
     @State private var idleThresholdMinutes: Int
+    @State private var ptoReducesWeeklyLimit: Bool
+    @State private var ptoDayMinutes: Int
 
     init(controller: TrackingController) {
         self.controller = controller
@@ -587,6 +594,8 @@ private struct SettingsView: View {
         _weeklyLimitMinutes = State(initialValue: controller.settings.weeklyLimitMinutes)
         _pausesWhenIdle = State(initialValue: controller.settings.pausesWhenIdle)
         _idleThresholdMinutes = State(initialValue: controller.settings.idleThresholdMinutes)
+        _ptoReducesWeeklyLimit = State(initialValue: controller.settings.ptoReducesWeeklyLimit)
+        _ptoDayMinutes = State(initialValue: controller.settings.ptoDayMinutes)
     }
 
     var body: some View {
@@ -594,6 +603,9 @@ private struct SettingsView: View {
             Section("Limits") {
                 LimitStepper(title: "Daily maximum", minutes: $dailyLimitMinutes, maxHours: 24)
                 LimitStepper(title: "Weekly maximum", minutes: $weeklyLimitMinutes, maxHours: 7 * 24)
+                Toggle("PTO reduces weekly maximum", isOn: $ptoReducesWeeklyLimit)
+                LimitStepper(title: "PTO day value", minutes: $ptoDayMinutes, maxHours: 24)
+                    .disabled(!ptoReducesWeeklyLimit)
             }
 
             Section("Tracking") {
@@ -633,11 +645,13 @@ private struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 470)
+        .frame(width: 460, height: 540)
         .onChange(of: dailyLimitMinutes) { _, _ in save() }
         .onChange(of: weeklyLimitMinutes) { _, _ in save() }
         .onChange(of: pausesWhenIdle) { _, _ in save() }
         .onChange(of: idleThresholdMinutes) { _, _ in save() }
+        .onChange(of: ptoReducesWeeklyLimit) { _, _ in save() }
+        .onChange(of: ptoDayMinutes) { _, _ in save() }
         .onChange(of: launchAtLogin) { _, isOn in
             do {
                 try LoginItem.setEnabled(isOn)
@@ -665,7 +679,9 @@ private struct SettingsView: View {
             dailyLimitMinutes: dailyLimitMinutes,
             weeklyLimitMinutes: weeklyLimitMinutes,
             pausesWhenIdle: pausesWhenIdle,
-            idleThresholdMinutes: idleThresholdMinutes
+            idleThresholdMinutes: idleThresholdMinutes,
+            ptoReducesWeeklyLimit: ptoReducesWeeklyLimit,
+            ptoDayMinutes: ptoDayMinutes
         )
     }
 }
