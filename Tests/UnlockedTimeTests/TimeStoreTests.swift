@@ -33,6 +33,7 @@ struct TimeStoreTests {
         #expect(data.settings.weeklyLimitMinutes == 2250)
         #expect(data.settings.pausesWhenIdle)
         #expect(data.settings.idleThresholdMinutes == 10)
+        #expect(data.ptoDays.isEmpty)
     }
 
     @Test func missingStoreStartsEmpty() throws {

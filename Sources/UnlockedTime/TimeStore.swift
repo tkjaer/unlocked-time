@@ -1,9 +1,31 @@
 import Foundation
 
 struct StoredTimeData: Codable, Equatable, Sendable {
-    var sessions: [WorkSession] = []
-    var settings = TrackingSettings()
+    var sessions: [WorkSession]
+    var settings: TrackingSettings
     var lastHeartbeat: Date?
+    var ptoDays: Set<String>
+
+    init(
+        sessions: [WorkSession] = [],
+        settings: TrackingSettings = TrackingSettings(),
+        lastHeartbeat: Date? = nil,
+        ptoDays: Set<String> = []
+    ) {
+        self.sessions = sessions
+        self.settings = settings
+        self.lastHeartbeat = lastHeartbeat
+        self.ptoDays = ptoDays
+    }
+
+    /// Files written before a field existed must still load, so every key falls back to its default.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessions = try container.decodeIfPresent([WorkSession].self, forKey: .sessions) ?? []
+        settings = try container.decodeIfPresent(TrackingSettings.self, forKey: .settings) ?? TrackingSettings()
+        lastHeartbeat = try container.decodeIfPresent(Date.self, forKey: .lastHeartbeat)
+        ptoDays = try container.decodeIfPresent(Set<String>.self, forKey: .ptoDays) ?? []
+    }
 }
 
 struct TimeStore: Sendable {

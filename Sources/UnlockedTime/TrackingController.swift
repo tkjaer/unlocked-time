@@ -56,6 +56,7 @@ final class TrackingController: ObservableObject {
 
     var sessions: [WorkSession] { data.sessions }
     var settings: TrackingSettings { data.settings }
+    var ptoDays: Set<String> { data.ptoDays }
     var isTracking: Bool { data.sessions.last?.end == nil }
 
     func updateSettings(
@@ -90,6 +91,29 @@ final class TrackingController: ObservableObject {
 
     func deleteSession(id: UUID) {
         data.sessions.removeAll { $0.id == id }
+        persist()
+    }
+
+    func setPTO(_ isPTO: Bool, forDay date: Date) {
+        apply(isPTO: isPTO, to: [date])
+    }
+
+    func setPTO(_ isPTO: Bool, forWeekContaining date: Date) {
+        let calendar = Calendar.current
+        guard let week = calendar.dateInterval(of: .weekOfYear, for: date) else { return }
+        let days = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: week.start) }
+        apply(isPTO: isPTO, to: days)
+    }
+
+    private func apply(isPTO: Bool, to days: [Date]) {
+        for day in days {
+            let key = TimeSummary.dayKey(day)
+            if isPTO {
+                data.ptoDays.insert(key)
+            } else {
+                data.ptoDays.remove(key)
+            }
+        }
         persist()
     }
 

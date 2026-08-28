@@ -83,14 +83,16 @@ private struct DashboardView: View {
                 sessions: controller.sessions,
                 now: controller.now,
                 limitMinutes: controller.settings.dailyLimitMinutes,
-                count: historyPeriod.count
+                count: historyPeriod.count,
+                ptoDays: controller.ptoDays
             )
         case .weeks:
             TimeSummary.weeklySeries(
                 sessions: controller.sessions,
                 now: controller.now,
                 limitMinutes: controller.settings.weeklyLimitMinutes,
-                count: historyPeriod.count
+                count: historyPeriod.count,
+                ptoDays: controller.ptoDays
             )
         }
     }
@@ -138,7 +140,15 @@ private struct DashboardView: View {
                 HistoryCard(
                     rows: series.reversed(),
                     period: historyPeriod,
-                    hasSessions: !controller.sessions.isEmpty
+                    hasSessions: !controller.sessions.isEmpty,
+                    onTogglePTO: { total in
+                        switch historyPeriod {
+                        case .days:
+                            controller.setPTO(!total.isPTO, forDay: total.start)
+                        case .weeks:
+                            controller.setPTO(!total.isPTO, forWeekContaining: total.start)
+                        }
+                    }
                 )
             }
             .padding(14)
@@ -376,18 +386,31 @@ private struct HistoryCard: View {
     let rows: [PeriodTotal]
     let period: HistoryPeriod
     let hasSessions: Bool
+    let onTogglePTO: (PeriodTotal) -> Void
 
     private var peak: Int { rows.map(\.minutes).max() ?? 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(period.historyTitle)
-                .font(.system(size: 12, weight: .semibold))
+            HStack(alignment: .firstTextBaseline) {
+                Text(period.historyTitle)
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                Text("Right-click to mark PTO")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
 
             if hasSessions {
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, total in
                         HistoryRow(total: total, period: period, isCurrent: index == 0, peak: peak)
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                Button(period.ptoActionTitle(isPTO: total.isPTO)) {
+                                    onTogglePTO(total)
+                                }
+                            }
                         if total.id != rows.last?.id {
                             Divider().opacity(0.4)
                         }
@@ -444,6 +467,15 @@ private struct HistoryRow: View {
                     .background(Color.accentColor.opacity(0.15), in: Capsule())
             }
 
+            if total.isPTO {
+                Text("PTO")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.secondary.opacity(0.15), in: Capsule())
+            }
+
             Spacer(minLength: 6)
 
             ZStack(alignment: .leading) {
@@ -489,6 +521,15 @@ private enum HistoryPeriod: String, CaseIterable, Identifiable {
             return date.formatted(.dateTime.day())
         }
         return "W\(Calendar.current.component(.weekOfYear, from: date))"
+    }
+
+    func ptoActionTitle(isPTO: Bool) -> String {
+        switch (self, isPTO) {
+        case (.days, false): "Mark as PTO"
+        case (.days, true): "Clear PTO"
+        case (.weeks, false): "Mark week as PTO"
+        case (.weeks, true): "Clear PTO for week"
+        }
     }
 }
 
