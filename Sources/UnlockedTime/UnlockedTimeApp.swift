@@ -302,6 +302,8 @@ struct TrendCard: View {
     let period: HistoryPeriod
     @Binding var selection: HistoryPeriod
     var showsPicker = true
+    var selectedStart: Date?
+    var onSelect: ((Date) -> Void)?
 
     private var limitMinutes: Int { series.first?.limitMinutes ?? 0 }
 
@@ -342,6 +344,17 @@ struct TrendCard: View {
                 RuleMark(y: .value("Limit", Double(limitMinutes)))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .foregroundStyle(Color.secondary.opacity(0.55))
+
+                ForEach(series.filter { $0.isPTO && $0.minutes == 0 }) { total in
+                    BarMark(
+                        x: .value("Period", total.start, unit: period.chartUnit),
+                        yStart: .value("From", 0.0),
+                        yEnd: .value("To", max(upperBound, 60) * 0.04),
+                        width: .ratio(0.55)
+                    )
+                    .cornerRadius(2)
+                    .foregroundStyle(Color.secondary.opacity(0.45))
+                }
             }
             .chartYScale(domain: 0...max(upperBound, 60))
             .chartYAxis {
@@ -368,8 +381,20 @@ struct TrendCard: View {
                 }
             }
             .frame(height: 112)
+            .chartOverlay { proxy in
+                if onSelect != nil {
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .onTapGesture(coordinateSpace: .local) { location in
+                                selectPeriod(at: location, proxy: proxy, geometry: geometry)
+                            }
+                    }
+                }
+            }
 
-            Text("Dashed line marks the \(formatMinutes(limitMinutes)) \(period == .days ? "daily" : "weekly") limit.")
+            Text(caption)
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
         }
@@ -377,12 +402,38 @@ struct TrendCard: View {
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    private var caption: String {
+        let limit = "Dashed line marks the \(formatMinutes(limitMinutes)) \(period == .days ? "daily" : "weekly") limit."
+        return series.contains(where: \.isPTO) ? limit + " Grey marks PTO." : limit
+    }
+
     private func barStyle(for total: PeriodTotal) -> AnyShapeStyle {
-        if total.isOver {
-            return AnyShapeStyle(Color.red.gradient)
+        let base = total.isOver ? Color.red : Color.accentColor
+        return AnyShapeStyle(base.opacity(isHighlighted(total) ? 1 : 0.4).gradient)
+    }
+
+    /// Matched by calendar period rather than exact instant, so a selection cannot miss by seconds.
+    private func isHighlighted(_ total: PeriodTotal) -> Bool {
+        guard let selectedStart else {
+            return total.start == series.last?.start
         }
-        let isCurrent = total.start == series.last?.start
-        return AnyShapeStyle(Color.accentColor.opacity(isCurrent ? 1 : 0.45).gradient)
+        return Calendar.current.isDate(
+            total.start,
+            equalTo: selectedStart,
+            toGranularity: period == .days ? .day : .weekOfYear
+        )
+    }
+
+    private func selectPeriod(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrame = proxy.plotFrame else { return }
+        let x = location.x - geometry[plotFrame].origin.x
+        guard let tapped: Date = proxy.value(atX: x) else { return }
+        let nearest = series.min {
+            abs($0.start.timeIntervalSince(tapped)) < abs($1.start.timeIntervalSince(tapped))
+        }
+        if let nearest {
+            onSelect?(nearest.start)
+        }
     }
 }
 
@@ -459,7 +510,7 @@ enum HistoryPeriod: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
     var title: String { self == .days ? "Days" : "Weeks" }
-    var historyTitle: String { self == .days ? "Last 7 days" : "Last 8 weeks" }
+    var historyTitle: String { self == .days ? "All days" : "All weeks" }
     var count: Int { self == .days ? 7 : 8 }
     var chartUnit: Calendar.Component { self == .days ? .day : .weekOfYear }
 

@@ -10,6 +10,33 @@ struct HistoryWindowView: View {
 
     private var calendar: Calendar { .current }
 
+    private var earliest: Date? {
+        let firstSession = controller.sessions.map(\.start).min()
+        let firstPTO = controller.ptoDays.compactMap { TimeSummary.date(fromDayKey: $0) }.min()
+        return [firstSession, firstPTO].compactMap { $0 }.min()
+    }
+
+    /// The list covers everything recorded, not just the charted window.
+    private var historyCount: Int {
+        guard let earliest else { return period.count }
+        switch period {
+        case .days:
+            let days = calendar.dateComponents(
+                [.day],
+                from: calendar.startOfDay(for: earliest),
+                to: calendar.startOfDay(for: controller.now)
+            ).day ?? 0
+            return min(max(days + 1, period.count), 3660)
+        case .weeks:
+            guard
+                let from = calendar.dateInterval(of: .weekOfYear, for: earliest)?.start,
+                let to = calendar.dateInterval(of: .weekOfYear, for: controller.now)?.start
+            else { return period.count }
+            let weeks = calendar.dateComponents([.weekOfYear], from: from, to: to).weekOfYear ?? 0
+            return min(max(weeks + 1, period.count), 520)
+        }
+    }
+
     private var topSeries: [PeriodTotal] {
         switch period {
         case .days:
@@ -17,7 +44,7 @@ struct HistoryWindowView: View {
                 sessions: controller.sessions,
                 now: controller.now,
                 limitMinutes: controller.settings.dailyLimitMinutes,
-                count: HistoryPeriod.days.count,
+                count: historyCount,
                 ptoDays: controller.ptoDays
             )
         case .weeks:
@@ -25,10 +52,29 @@ struct HistoryWindowView: View {
                 sessions: controller.sessions,
                 now: controller.now,
                 limitMinutes: controller.settings.weeklyLimitMinutes,
-                count: HistoryPeriod.weeks.count,
+                count: historyCount,
                 ptoDays: controller.ptoDays
             )
         }
+    }
+
+    /// Keeps the charted window anchored on the selection so it stays visible.
+    private var chartSeries: [PeriodTotal] {
+        let window = period.count
+        let selected = period == .weeks ? weekStart : selectedDay
+        let granularity: Calendar.Component = period == .days ? .day : .weekOfYear
+
+        guard
+            let selected,
+            let index = topSeries.lastIndex(where: {
+                calendar.isDate($0.start, equalTo: selected, toGranularity: granularity)
+            })
+        else {
+            return Array(topSeries.suffix(window))
+        }
+
+        let end = index + 1
+        return Array(topSeries[max(0, end - window)..<end])
     }
 
     private var weekStart: Date? {
@@ -63,10 +109,12 @@ struct HistoryWindowView: View {
 
             VStack(spacing: 12) {
                 TrendCard(
-                    series: topSeries,
+                    series: chartSeries,
                     period: period,
                     selection: $period,
-                    showsPicker: false
+                    showsPicker: false,
+                    selectedStart: period == .weeks ? weekStart : selectedDay,
+                    onSelect: selectFromChart
                 )
 
                 HStack(alignment: .top, spacing: 12) {
@@ -204,6 +252,16 @@ struct HistoryWindowView: View {
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
+    }
+
+    private func selectFromChart(_ start: Date) {
+        switch period {
+        case .weeks:
+            selectedWeek = start
+            selectedDay = nil
+        case .days:
+            selectedDay = start
+        }
     }
 
     private func isSelectedDay(_ row: PeriodTotal) -> Bool {

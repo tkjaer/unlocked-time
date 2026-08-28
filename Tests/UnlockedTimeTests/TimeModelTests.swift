@@ -185,6 +185,14 @@ struct TimeModelTests {
         #expect(days[1].minutes == 120)
     }
 
+    @Test func dayKeyRoundTrips() {
+        let day = date(2026, 7, 6)
+        let key = TimeSummary.dayKey(day, calendar: calendar)
+
+        #expect(key == "2026-07-06")
+        #expect(TimeSummary.date(fromDayKey: key, calendar: calendar) == day)
+    }
+
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: year,
