@@ -58,10 +58,44 @@ private struct MenuBarLabel: View {
             count: 1
         )[0]
 
-        Label(
-            formatMinutesCompact(today.minutes),
-            systemImage: today.isOver ? "exclamationmark.circle.fill" : "clock"
-        )
+        let week = TimeSummary.weeklySeries(
+            sessions: controller.sessions,
+            now: controller.now,
+            limitMinutes: controller.settings.weeklyLimitMinutes,
+            count: 1,
+            ptoDays: controller.ptoDays,
+            ptoDayMinutes: controller.settings.ptoDayMinutes,
+            reducesLimitForPTO: controller.settings.ptoReducesWeeklyLimit
+        )[0]
+
+        // A red dot when either limit is passed. Letters for day and week were tried and are
+        // illegible at menu bar size; the panel says which.
+        Label {
+            Text(formatMinutesCompact(today.minutes))
+        } icon: {
+            icon(isOver: today.isOver || week.isOver)
+        }
+    }
+
+    @ViewBuilder
+    private func icon(isOver: Bool) -> some View {
+        if isOver, let badged = Self.badged {
+            Image(nsImage: badged)
+        } else {
+            Image(systemName: "clock")
+        }
+    }
+
+    /// Palette layer 0 is the badge and layer 1 the clock, not the other way round.
+    private static var badged: NSImage? {
+        guard let base = NSImage(systemSymbolName: "clock.badge", accessibilityDescription: nil),
+              let image = base.withSymbolConfiguration(
+                  NSImage.SymbolConfiguration(paletteColors: [.systemRed, .labelColor])
+              )
+        else { return nil }
+
+        image.isTemplate = false
+        return image
     }
 }
 
@@ -687,7 +721,7 @@ private struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 570)
+        .frame(width: 460, height: 660)
         .onChange(of: dailyLimitMinutes) { _, _ in save() }
         .onChange(of: weeklyLimitMinutes) { _, _ in save() }
         .onChange(of: pausesWhenIdle) { _, _ in save() }
