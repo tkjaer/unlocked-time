@@ -616,31 +616,74 @@ enum HistoryPeriod: String, CaseIterable, Identifiable {
     }
 }
 
+enum MinuteStep {
+    static func increment(_ minute: Int) -> Int {
+        guard minute < 55 else { return minute }
+        return min((minute / 5 + 1) * 5, 55)
+    }
+
+    static func decrement(_ minute: Int) -> Int {
+        guard minute > 0 else { return minute }
+        return max(((minute - 1) / 5) * 5, 0)
+    }
+}
+
+private enum LimitInputField: Hashable {
+    case hours(String)
+    case minutes(String)
+}
+
 private struct LimitStepper: View {
+    let id: String
     let title: String
     @Binding var minutes: Int
     let maxHours: Int
+    let focusedField: FocusState<LimitInputField?>.Binding
 
     private var hoursBinding: Binding<Int> {
-        Binding(get: { minutes / 60 }, set: { minutes = $0 * 60 + minutes % 60 })
+        Binding(
+            get: { minutes / 60 },
+            set: { minutes = min(max($0, 0), maxHours) * 60 + minutes % 60 }
+        )
     }
 
     private var minutesBinding: Binding<Int> {
-        Binding(get: { minutes % 60 }, set: { minutes = (minutes / 60) * 60 + $0 })
+        Binding(
+            get: { minutes % 60 },
+            set: { minutes = (minutes / 60) * 60 + min(max($0, 0), 59) }
+        )
     }
 
     var body: some View {
         LabeledContent(title) {
             HStack(spacing: 12) {
                 Stepper(value: hoursBinding, in: 0...maxHours) {
-                    Text("\(minutes / 60) h")
-                        .monospacedDigit()
+                    HStack(spacing: 3) {
+                        TextField("Hours", value: hoursBinding, format: .number)
+                            .labelsHidden()
+                            .focused(focusedField, equals: .hours(id))
+                            .multilineTextAlignment(.trailing)
+                            .monospacedDigit()
+                            .frame(width: 32)
+                        Text("h")
+                    }
                 }
                 .fixedSize()
 
-                Stepper(value: minutesBinding, in: 0...55, step: 5) {
-                    Text(String(format: "%02d m", minutes % 60))
-                        .monospacedDigit()
+                Stepper {
+                    HStack(spacing: 3) {
+                        TextField("Minutes", value: minutesBinding, format: .number)
+                            .labelsHidden()
+                            .focused(focusedField, equals: .minutes(id))
+                            .multilineTextAlignment(.trailing)
+                            .monospacedDigit()
+                            .frame(width: 28)
+                        Text("m")
+                    }
+                } onIncrement: {
+                    minutesBinding.wrappedValue = MinuteStep.increment(minutesBinding.wrappedValue)
+                } onDecrement: {
+                    minutesBinding.wrappedValue = MinuteStep.decrement(minutesBinding.wrappedValue)
                 }
                 .fixedSize()
             }
@@ -661,6 +704,7 @@ private struct SettingsView: View {
     @State private var ptoReducesWeeklyLimit: Bool
     @State private var ptoDayMinutes: Int
     @State private var notifiesOnLimit: Bool
+    @FocusState private var focusedLimitField: LimitInputField?
 
     init(controller: TrackingController) {
         self.controller = controller
@@ -676,10 +720,28 @@ private struct SettingsView: View {
     var body: some View {
         Form {
             Section("Limits") {
-                LimitStepper(title: "Daily maximum", minutes: $dailyLimitMinutes, maxHours: 24)
-                LimitStepper(title: "Weekly maximum", minutes: $weeklyLimitMinutes, maxHours: 7 * 24)
+                LimitStepper(
+                    id: "daily",
+                    title: "Daily maximum",
+                    minutes: $dailyLimitMinutes,
+                    maxHours: 24,
+                    focusedField: $focusedLimitField
+                )
+                LimitStepper(
+                    id: "weekly",
+                    title: "Weekly maximum",
+                    minutes: $weeklyLimitMinutes,
+                    maxHours: 7 * 24,
+                    focusedField: $focusedLimitField
+                )
                 Toggle("PTO reduces weekly maximum", isOn: $ptoReducesWeeklyLimit)
-                LimitStepper(title: "PTO day value", minutes: $ptoDayMinutes, maxHours: 24)
+                LimitStepper(
+                    id: "pto",
+                    title: "PTO day value",
+                    minutes: $ptoDayMinutes,
+                    maxHours: 24,
+                    focusedField: $focusedLimitField
+                )
                     .disabled(!ptoReducesWeeklyLimit)
             }
 
@@ -722,6 +784,9 @@ private struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 460, height: 660)
+        .onTapGesture {
+            focusedLimitField = nil
+        }
         .onChange(of: dailyLimitMinutes) { _, _ in save() }
         .onChange(of: weeklyLimitMinutes) { _, _ in save() }
         .onChange(of: pausesWhenIdle) { _, _ in save() }

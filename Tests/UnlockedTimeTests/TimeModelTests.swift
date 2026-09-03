@@ -294,6 +294,20 @@ struct TimeModelTests {
         #expect(TimeSummary.overage(totals).isClean)
     }
 
+    @Test func minuteStepRoundsInTheDirectionOfTravel() {
+        #expect(MinuteStep.increment(21) == 25)
+        #expect(MinuteStep.increment(25) == 30)
+        #expect(MinuteStep.decrement(29) == 25)
+        #expect(MinuteStep.decrement(25) == 20)
+    }
+
+    @Test func minuteStepStaysWithinStepperLimits() {
+        #expect(MinuteStep.increment(55) == 55)
+        #expect(MinuteStep.increment(59) == 59)
+        #expect(MinuteStep.decrement(1) == 0)
+        #expect(MinuteStep.decrement(0) == 0)
+    }
+
     @Test func intervalsCarrySessionIdentityAndOpenState() {
         let closed = WorkSession(start: date(2026, 8, 27, 9), end: date(2026, 8, 27, 11))
         let open = WorkSession(start: date(2026, 8, 27, 13))
