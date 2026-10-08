@@ -117,6 +117,14 @@ struct HistoryChartTests {
         #expect(TimeSummary.ptoDayCount(pto, from: date(2026, 8, 10), to: date(2026, 8, 17), calendar: calendar) == 2)
     }
 
+    @Test func hourAxisUsesWholeHours() {
+        #expect(HourAxis.ticks(upTo: 762) == [0, 240, 480, 720])
+        #expect(HourAxis.ticks(upTo: 2958) == [0, 1200, 2400])
+        #expect(HourAxis.ticks(upTo: 60) == [0, 60])
+        #expect(HourAxis.ticks(upTo: 150) == [0, 60, 120])
+        #expect(HourAxis.ticks(upTo: 600 * 60) == [0, 12_000, 24_000, 36_000])
+    }
+
     private func days(count: Int, length: Int) -> ChartWindow {
         let series = (0..<count).reversed().map {
             PeriodTotal(

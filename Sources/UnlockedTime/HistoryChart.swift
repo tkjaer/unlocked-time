@@ -1,6 +1,19 @@
 import Charts
 import SwiftUI
 
+/// Gridlines on whole hours. Charts' automatic ticks are round in minutes, which put lines at
+/// odd times such as 16h 40m.
+enum HourAxis {
+    static let steps = [1, 2, 4, 5, 10, 20, 25, 50, 100, 200, 500]
+
+    /// Tick positions in minutes, from zero up to `upperMinutes`, with at most `maxTicks` above zero.
+    static func ticks(upTo upperMinutes: Double, maxTicks: Int = 3) -> [Double] {
+        let hours = upperMinutes / 60
+        let step = steps.first { hours / Double($0) < Double(maxTicks + 1) } ?? steps.last!
+        return stride(from: 0, through: upperMinutes, by: Double(step * 60)).map { $0 }
+    }
+}
+
 struct ChartZoom: Equatable, Sendable {
     let count: Int
     let title: String
@@ -318,7 +331,7 @@ struct HistoryChart: View {
         .chartScrollPosition(x: $scrollStart)
         .chartScrollTargetBehavior(.valueAligned(matching: alignment))
         .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+            AxisMarks(position: .leading, values: HourAxis.ticks(upTo: upperBound)) { value in
                 AxisGridLine().foregroundStyle(.quaternary)
                 AxisValueLabel {
                     if let minutes = value.as(Double.self) {
@@ -393,7 +406,7 @@ struct HistoryChart: View {
     private var caption: String {
         let unit = period == .days ? "day" : "week"
         var parts = ["Dashed line marks the \(formatMinutes(limitMinutes)) \(period == .days ? "daily" : "weekly") limit."]
-        if series.contains(where: \.isPTO) {
+        if visible.contains(where: \.isPTO) {
             parts.append("Grey marks PTO.")
         }
         if showsAverage {

@@ -426,7 +426,7 @@ struct TrendCard: View {
             }
             .chartYScale(domain: 0...max(upperBound, 60))
             .chartYAxis {
-                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                AxisMarks(position: .leading, values: HourAxis.ticks(upTo: max(upperBound, 60))) { value in
                     AxisGridLine().foregroundStyle(.quaternary)
                     AxisValueLabel {
                         if let minutes = value.as(Double.self) {
