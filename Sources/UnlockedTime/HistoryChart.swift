@@ -166,32 +166,41 @@ struct ChartWindow {
     }
 }
 
-/// The History window's trend chart: scrolls through all history and zooms between fixed spans.
+/// The History window's trend card: a chart that scrolls through all history and zooms between
+/// fixed spans, or a calendar of a year of days.
 struct HistoryChart: View {
     let series: [PeriodTotal]
+    /// The daily series, in Weeks mode too. Only needed, and only built, for the calendar.
+    let days: [PeriodTotal]
     let period: HistoryPeriod
     let ptoDays: Set<String>
     var selectedStart: Date?
+    @Binding var style: TrendStyle
     var onSelect: (Date) -> Void
 
     @State private var zoomSteps: [HistoryPeriod: Int] = [:]
     @State private var scrollStart: Date
     @State private var tapped: Date?
     @State private var pinchBase: CGFloat = 1
+    @State private var yearsBack = 0
 
     private var calendar: Calendar { .current }
 
     init(
         series: [PeriodTotal],
+        days: [PeriodTotal],
         period: HistoryPeriod,
         ptoDays: Set<String>,
         selectedStart: Date?,
+        style: Binding<TrendStyle>,
         onSelect: @escaping (Date) -> Void
     ) {
         self.series = series
+        self.days = days
         self.period = period
         self.ptoDays = ptoDays
         self.selectedStart = selectedStart
+        _style = style
         self.onSelect = onSelect
 
         let length = period.zoomLevels(available: series.count)[0].count
@@ -228,13 +237,33 @@ struct HistoryChart: View {
         .filter { $0.start >= first.start }
     }
 
+    // The calendar always shows days, so its summary is of days in Weeks mode too.
+    private var isCalendar: Bool { style == .calendar }
+    private var summaryPeriod: HistoryPeriod { isCalendar ? .days : period }
+
+    private var today: Date { days.last?.start ?? calendar.startOfDay(for: Date()) }
+
+    private var oldestYearsBack: Int {
+        days.first.map { HeatmapYear.yearsBack(containing: $0.start, today: today, calendar: calendar) } ?? 0
+    }
+
+    private var heatmapYear: HeatmapYear {
+        HeatmapYear.ending(today, yearsBack: min(max(yearsBack, 0), oldestYearsBack), calendar: calendar)
+    }
+
     private var summary: RangeSummary {
-        TimeSummary.rangeSummary(visible, inProgress: inProgress) {
-            period.includesInAverage($0, calendar: calendar)
+        let totals = isCalendar ? Array(heatmapYear.days(in: days, calendar: calendar)) : visible
+        return TimeSummary.rangeSummary(totals, inProgress: isCalendar ? days.last?.start : inProgress) {
+            summaryPeriod.includesInAverage($0, calendar: calendar)
         }
     }
 
     private var visiblePTODays: Int {
+        if isCalendar {
+            let year = heatmapYear
+            let end = calendar.date(byAdding: .day, value: 1, to: year.end) ?? year.end
+            return TimeSummary.ptoDayCount(ptoDays, from: year.start, to: end)
+        }
         guard let first = visible.first, let last = visible.last else { return 0 }
         return TimeSummary.ptoDayCount(ptoDays, from: first.start, to: window.add(1, to: last.start))
     }
@@ -242,13 +271,29 @@ struct HistoryChart: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            chart
+            if isCalendar {
+                CalendarHeatmap(
+                    layout: HeatmapLayout(days: days, year: heatmapYear, calendar: calendar),
+                    period: period,
+                    selectedStart: selectedStart,
+                    onSelect: onSelect
+                )
+                .frame(height: 112)
+            } else {
+                chart
+            }
             summaryRow
 
             HStack {
-                Text(caption)
-                Spacer(minLength: 8)
-                Text("Scroll to go back. Pinch or press ⌘+ and ⌘− to zoom.")
+                if isCalendar {
+                    HeatmapLegend(limitMinutes: days.last?.limitMinutes ?? 0)
+                    Spacer(minLength: 8)
+                    Text(period == .days ? "Click a day to select it." : "Click a day to select its week.")
+                } else {
+                    Text(caption)
+                    Spacer(minLength: 8)
+                    Text("Scroll to go back. Pinch or press ⌘+ and ⌘− to zoom.")
+                }
             }
             .font(.system(size: 9))
             .foregroundStyle(.secondary)
@@ -258,6 +303,13 @@ struct HistoryChart: View {
         .onChange(of: selectedStart) { _, selection in
             guard let selection else { return }
             scrollStart = window.start(showing: selection, from: scrollStart)
+            if isCalendar {
+                yearsBack = yearsBack(showing: selection)
+            }
+        }
+        .onChange(of: style) { _, style in
+            guard style == .calendar else { return }
+            yearsBack = selectedStart.map(yearsBack(showing:)) ?? 0
         }
         .onChange(of: period) {
             scrollStart = window.initialStart(showing: selectedStart)
@@ -283,36 +335,81 @@ struct HistoryChart: View {
 
             Spacer()
 
-            HStack(spacing: 2) {
-                Button(action: zoomOut) {
-                    Image(systemName: "minus.magnifyingglass")
-                }
-                .disabled(zoomIndex == levels.count - 1)
-                .keyboardShortcut("-", modifiers: .command)
-                .help("Zoom out (⌘−)")
+            if isCalendar {
+                yearControls
+            } else {
+                zoomControls
+            }
 
-                Text(zoom.title)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 56)
-
-                Button(action: zoomIn) {
-                    Image(systemName: "plus.magnifyingglass")
+            Picker("Style", selection: $style) {
+                ForEach(TrendStyle.allCases) { style in
+                    Text(style.title).tag(style)
                 }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            .frame(width: 130)
+            .help("Show the trend as a chart or as a calendar of days")
+        }
+    }
+
+    private var yearControls: some View {
+        HStack(spacing: 2) {
+            Button {
+                yearsBack = heatmapYear.yearsBack + 1
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .disabled(heatmapYear.yearsBack >= oldestYearsBack)
+            .help("Previous year")
+
+            Text(heatmapYear.title)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 56)
+
+            Button {
+                yearsBack = heatmapYear.yearsBack - 1
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(heatmapYear.yearsBack == 0)
+            .help("Next year")
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private var zoomControls: some View {
+        HStack(spacing: 2) {
+            Button(action: zoomOut) {
+                Image(systemName: "minus.magnifyingglass")
+            }
+            .disabled(zoomIndex == levels.count - 1)
+            .keyboardShortcut("-", modifiers: .command)
+            .help("Zoom out (⌘−)")
+
+            Text(zoom.title)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 56)
+
+            Button(action: zoomIn) {
+                Image(systemName: "plus.magnifyingglass")
+            }
+            .disabled(zoomIndex == 0)
+            .keyboardShortcut("+", modifiers: .command)
+            .help("Zoom in (⌘+)")
+        }
+        .buttonStyle(.borderless)
+        // ⌘+ is ⌘= without Shift on layouts such as US English.
+        .background {
+            Button("", action: zoomIn)
+                .keyboardShortcut("=", modifiers: .command)
                 .disabled(zoomIndex == 0)
-                .keyboardShortcut("+", modifiers: .command)
-                .help("Zoom in (⌘+)")
-            }
-            .buttonStyle(.borderless)
-            // ⌘+ is ⌘= without Shift on layouts such as US English.
-            .background {
-                Button("", action: zoomIn)
-                    .keyboardShortcut("=", modifiers: .command)
-                    .disabled(zoomIndex == 0)
-                    .opacity(0)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
+                .opacity(0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
@@ -409,9 +506,9 @@ struct HistoryChart: View {
     private var summaryRow: some View {
         HStack(spacing: 18) {
             stat("Total", formatMinutes(summary.totalMinutes))
-            stat(period == .days ? "Average day" : "Average week", formatMinutes(summary.averageMinutes))
+            stat(summaryPeriod == .days ? "Average day" : "Average week", formatMinutes(summary.averageMinutes))
                 .help(
-                    period == .days
+                    summaryPeriod == .days
                         ? "Average of the workdays in view with tracked time, leaving out weekends, PTO and today."
                         : "Average of the weeks in view with tracked time, leaving out the current one."
                 )
@@ -451,6 +548,10 @@ struct HistoryChart: View {
     }
 
     private var rangeText: String {
+        if isCalendar {
+            let year = heatmapYear
+            return (year.start..<year.end).formatted(.interval.day().month(.abbreviated).year())
+        }
         guard let first = visible.first, let last = visible.last else { return "" }
         let end = calendar.date(byAdding: .day, value: -1, to: window.add(1, to: last.start)) ?? last.start
         return (first.start..<max(end, first.start)).formatted(
@@ -507,6 +608,15 @@ struct HistoryChart: View {
     private func isHighlighted(_ total: PeriodTotal) -> Bool {
         guard let selectedStart else { return total.start == series.last?.start }
         return calendar.isDate(total.start, equalTo: selectedStart, toGranularity: period.chartUnit)
+    }
+
+    /// Keeps the year when it already shows the selected day or any day of the selected week.
+    private func yearsBack(showing selection: Date) -> Int {
+        let first = calendar.startOfDay(for: selection)
+        let last = period == .weeks ? calendar.date(byAdding: .day, value: 6, to: first) ?? first : first
+        let year = heatmapYear
+        if year.overlaps(first, through: last) { return year.yearsBack }
+        return HeatmapYear.yearsBack(containing: min(last, today), today: today, calendar: calendar)
     }
 
     private func zoomIn() { setZoom(zoomIndex - 1) }

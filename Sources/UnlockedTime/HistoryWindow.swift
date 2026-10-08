@@ -25,6 +25,7 @@ struct WorkLogDocument: FileDocument {
 struct HistoryWindowView: View {
     @ObservedObject var controller: TrackingController
     @State private var period = HistoryPeriod.days
+    @State private var trendStyle = TrendStyle.chart
     @State private var selectedWeek: Date?
     @State private var selectedDay: Date? = Calendar.current.startOfDay(for: Date())
     @State private var isExporting = false
@@ -43,7 +44,7 @@ struct HistoryWindowView: View {
     }
 
     /// The list covers everything recorded, not just the charted window.
-    private var historyCount: Int {
+    private func historyCount(_ period: HistoryPeriod) -> Int {
         guard let earliest else { return period.count }
         switch period {
         case .days:
@@ -63,22 +64,26 @@ struct HistoryWindowView: View {
         }
     }
 
+    private var daySeries: [PeriodTotal] {
+        TimeSummary.dailySeries(
+            sessions: controller.sessions,
+            now: controller.now,
+            limitMinutes: controller.settings.dailyLimitMinutes,
+            count: historyCount(.days),
+            ptoDays: controller.ptoDays
+        )
+    }
+
     private var topSeries: [PeriodTotal] {
         switch period {
         case .days:
-            TimeSummary.dailySeries(
-                sessions: controller.sessions,
-                now: controller.now,
-                limitMinutes: controller.settings.dailyLimitMinutes,
-                count: historyCount,
-                ptoDays: controller.ptoDays
-            )
+            daySeries
         case .weeks:
             TimeSummary.weeklySeries(
                 sessions: controller.sessions,
                 now: controller.now,
                 limitMinutes: controller.settings.weeklyLimitMinutes,
-                count: historyCount,
+                count: historyCount(.weeks),
                 ptoDays: controller.ptoDays,
                 ptoDayMinutes: controller.settings.ptoDayMinutes,
                 reducesLimitForPTO: controller.settings.ptoReducesWeeklyLimit
@@ -113,6 +118,8 @@ struct HistoryWindowView: View {
     var body: some View {
         // Built once per update: a long history makes the series costly to rebuild.
         let topSeries = topSeries
+        // The calendar is always days; in Weeks mode they are built only while it is shown.
+        let days = period == .days ? topSeries : trendStyle == .calendar ? daySeries : []
 
         return VStack(spacing: 0) {
             header
@@ -122,9 +129,11 @@ struct HistoryWindowView: View {
             VStack(spacing: 12) {
                 HistoryChart(
                     series: topSeries,
+                    days: days,
                     period: period,
                     ptoDays: controller.ptoDays,
                     selectedStart: period == .weeks ? weekStart : selectedDay,
+                    style: $trendStyle,
                     onSelect: selectFromChart
                 )
 
