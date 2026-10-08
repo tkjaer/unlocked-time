@@ -287,7 +287,11 @@ struct HistoryChart: View {
 
     private var summary: RangeSummary {
         let totals = isCalendar ? Array(heatmapYear.days(in: days, calendar: calendar)) : visible
-        return TimeSummary.rangeSummary(totals, inProgress: isCalendar ? days.last?.start : inProgress) {
+        return TimeSummary.rangeSummary(
+            totals,
+            inProgress: isCalendar ? days.last?.start : inProgress,
+            countOnlyWorkedPeriods: summaryPeriod == .days
+        ) {
             summaryPeriod.includesInAverage($0, calendar: calendar)
         }
     }
@@ -550,6 +554,11 @@ struct HistoryChart: View {
                 "Over limit",
                 "\(summary.periodsOver) of \(summary.periodCount)",
                 isAlert: summary.periodsOver > 0
+            )
+            .help(
+                summaryPeriod == .days
+                    ? "Completed workdays over the limit, leaving out weekends, PTO and today."
+                    : "Weeks over the limit in view."
             )
             stat("Overage", formatMinutes(summary.overageMinutes), isAlert: summary.overageMinutes > 0)
             stat("PTO", visiblePTODays == 1 ? "1 day" : "\(visiblePTODays) days")

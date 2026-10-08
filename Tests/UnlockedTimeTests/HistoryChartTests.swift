@@ -176,15 +176,23 @@ struct HistoryChartTests {
             PeriodTotal(start: date(2026, 8, 7), minutes: 420, limitMinutes: 420),
             PeriodTotal(start: date(2026, 8, 8), minutes: 60, limitMinutes: 420),
             PeriodTotal(start: date(2026, 8, 10), minutes: 120, limitMinutes: 420, isPTO: true),
-            PeriodTotal(start: date(2026, 8, 11), minutes: 480, limitMinutes: 420)
+            PeriodTotal(start: date(2026, 8, 11), minutes: 480, limitMinutes: 420),
+            PeriodTotal(start: date(2026, 8, 12), minutes: 0, limitMinutes: 420),
+            PeriodTotal(start: date(2026, 8, 13), minutes: 600, limitMinutes: 420)
         ]
 
-        let summary = TimeSummary.rangeSummary(totals) {
+        let summary = TimeSummary.rangeSummary(
+            totals,
+            inProgress: date(2026, 8, 13),
+            countOnlyWorkedPeriods: true
+        ) {
             HistoryPeriod.days.includesInAverage($0, calendar: calendar)
         }
 
-        #expect(summary.totalMinutes == 1080)
-        #expect(summary.overageMinutes == 60)
+        #expect(summary.totalMinutes == 1680)
+        #expect(summary.periodCount == 2)
+        #expect(summary.periodsOver == 1)
+        #expect(summary.overageMinutes == 240)
         #expect(summary.averageMinutes == 450)
     }
 

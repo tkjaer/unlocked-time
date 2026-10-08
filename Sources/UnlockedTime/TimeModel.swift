@@ -287,21 +287,24 @@ enum TimeSummary {
         )
     }
 
-    /// Totals for a stretch of periods. The average leaves out the period still in progress,
-    /// periods without tracked time, and periods the caller does not consider regular work.
+    /// Totals for a stretch of periods. The average uses completed periods with tracked time that
+    /// the caller considers regular work. The caller can use those periods for the over-limit
+    /// count too. Total time and overage always include every period.
     static func rangeSummary(
         _ totals: [PeriodTotal],
         inProgress: Date? = nil,
+        countOnlyWorkedPeriods: Bool = false,
         includeInAverage: (PeriodTotal) -> Bool = { _ in true }
     ) -> RangeSummary {
         let overage = overage(totals)
         let worked = totals.filter {
             $0.minutes > 0 && $0.start != inProgress && includeInAverage($0)
         }
+        let counted = countOnlyWorkedPeriods ? worked : totals
         return RangeSummary(
             totalMinutes: totals.reduce(0) { $0 + $1.minutes },
-            periodCount: totals.count,
-            periodsOver: overage.periodsOver,
+            periodCount: counted.count,
+            periodsOver: counted.filter(\.isOver).count,
             overageMinutes: overage.minutes,
             averageMinutes: worked.isEmpty ? 0 : worked.reduce(0) { $0 + $1.minutes } / worked.count
         )
