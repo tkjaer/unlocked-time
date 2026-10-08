@@ -374,9 +374,6 @@ struct TrendCard: View {
     let series: [PeriodTotal]
     let period: HistoryPeriod
     @Binding var selection: HistoryPeriod
-    var showsPicker = true
-    var selectedStart: Date?
-    var onSelect: ((Date) -> Void)?
 
     private var limitMinutes: Int { series.first?.limitMinutes ?? 0 }
 
@@ -390,17 +387,15 @@ struct TrendCard: View {
                 Text("Trend")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                if showsPicker {
-                    Picker("Period", selection: $selection) {
-                        ForEach(HistoryPeriod.allCases) { value in
-                            Text(value.title).tag(value)
-                        }
+                Picker("Period", selection: $selection) {
+                    ForEach(HistoryPeriod.allCases) { value in
+                        Text(value.title).tag(value)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .controlSize(.small)
-                    .frame(width: 124)
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(width: 124)
             }
 
             Chart {
@@ -454,18 +449,6 @@ struct TrendCard: View {
                 }
             }
             .frame(height: 112)
-            .chartOverlay { proxy in
-                if onSelect != nil {
-                    GeometryReader { geometry in
-                        Rectangle()
-                            .fill(.clear)
-                            .contentShape(Rectangle())
-                            .onTapGesture(coordinateSpace: .local) { location in
-                                selectPeriod(at: location, proxy: proxy, geometry: geometry)
-                            }
-                    }
-                }
-            }
 
             Text(caption)
                 .font(.system(size: 9))
@@ -482,36 +465,7 @@ struct TrendCard: View {
 
     private func barStyle(for total: PeriodTotal) -> AnyShapeStyle {
         let base = total.isOver ? Color.red : Color.accentColor
-        return AnyShapeStyle(base.opacity(isHighlighted(total) ? 1 : 0.4).gradient)
-    }
-
-    /// Matched by calendar period rather than exact instant, so a selection cannot miss by seconds.
-    private func isHighlighted(_ total: PeriodTotal) -> Bool {
-        guard let selectedStart else {
-            return total.start == series.last?.start
-        }
-        return Calendar.current.isDate(
-            total.start,
-            equalTo: selectedStart,
-            toGranularity: period == .days ? .day : .weekOfYear
-        )
-    }
-
-    private func selectPeriod(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        guard let plotFrame = proxy.plotFrame else { return }
-        let x = location.x - geometry[plotFrame].origin.x
-
-        // Categorical axis: resolve the tapped band, falling back to the nearest band centre.
-        if let label: String = proxy.value(atX: x),
-           let match = series.first(where: { period.axisLabel(for: $0.start) == label }) {
-            onSelect?(match.start)
-            return
-        }
-
-        guard !series.isEmpty, let width = proxy.plotSize.width as CGFloat? else { return }
-        let band = width / CGFloat(series.count)
-        let index = min(max(Int(x / max(band, 1)), 0), series.count - 1)
-        onSelect?(series[index].start)
+        return AnyShapeStyle(base.opacity(total.start == series.last?.start ? 1 : 0.4).gradient)
     }
 }
 

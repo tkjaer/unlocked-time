@@ -25,20 +25,29 @@ enum DemoData {
         var sessions: [WorkSession] = []
         var ptoDays: Set<String> = []
 
-        for offset in 1...70 {
+        for offset in 1...420 {
             guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
             guard !calendar.isDateInWeekend(day) else { continue }
 
-            // Two weeks off, so PTO shows in the day list, the week list and the chart.
-            if (8...12).contains(offset) || (39...43).contains(offset) {
+            // Two weeks off, so PTO shows in the day list, the week list and the chart. Older
+            // holidays give the zoomed-out chart some shape.
+            if (8...12).contains(offset) || (39...43).contains(offset)
+                || (120...137).contains(offset) || (290...296).contains(offset) {
                 ptoDays.insert(TimeSummary.dayKey(day, calendar: calendar))
                 continue
             }
 
-            for block in shapes[offset % shapes.count] {
+            // Lighter and heavier stretches before the last ten weeks, so the trend line moves.
+            let blocks = shapes[offset % shapes.count]
+            let isLightWeek = offset > 70 && (offset / 7) % 6 == 0
+            let isHeavyStretch = offset > 70 && (offset / 30) % 4 == 1
+
+            for (index, block) in blocks.enumerated() {
+                if isLightWeek, index > 0 { continue }
+                let endHour = isHeavyStretch && index == blocks.count - 1 ? block.end.0 + 1 : block.end.0
                 guard
                     let start = calendar.date(bySettingHour: block.start.0, minute: block.start.1, second: 0, of: day),
-                    let end = calendar.date(bySettingHour: block.end.0, minute: block.end.1, second: 0, of: day)
+                    let end = calendar.date(bySettingHour: endHour, minute: block.end.1, second: 0, of: day)
                 else { continue }
                 sessions.append(WorkSession(start: start, end: end))
             }

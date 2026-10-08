@@ -86,25 +86,6 @@ struct HistoryWindowView: View {
         }
     }
 
-    /// Keeps the charted window anchored on the selection so it stays visible.
-    private var chartSeries: [PeriodTotal] {
-        let window = period.count
-        let selected = period == .weeks ? weekStart : selectedDay
-        let granularity: Calendar.Component = period == .days ? .day : .weekOfYear
-
-        guard
-            let selected,
-            let index = topSeries.lastIndex(where: {
-                calendar.isDate($0.start, equalTo: selected, toGranularity: granularity)
-            })
-        else {
-            return Array(topSeries.suffix(window))
-        }
-
-        let end = index + 1
-        return Array(topSeries[max(0, end - window)..<end])
-    }
-
     private var weekStart: Date? {
         selectedWeek ?? calendar.dateInterval(of: .weekOfYear, for: controller.now)?.start
     }
@@ -136,11 +117,10 @@ struct HistoryWindowView: View {
             Divider()
 
             VStack(spacing: 12) {
-                TrendCard(
-                    series: chartSeries,
+                HistoryChart(
+                    series: topSeries,
                     period: period,
-                    selection: $period,
-                    showsPicker: false,
+                    ptoDays: controller.ptoDays,
                     selectedStart: period == .weeks ? weekStart : selectedDay,
                     onSelect: selectFromChart
                 )
@@ -188,7 +168,7 @@ struct HistoryWindowView: View {
             }
             .padding(16)
         }
-        .frame(width: 880, height: 640)
+        .frame(width: 880, height: 670)
         .sheet(item: $editing) { draft in
             SessionEditor(draft: draft) { start, end in
                 if let id = draft.sessionID {
