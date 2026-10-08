@@ -22,7 +22,7 @@ them.
 - The moment the weekly limit was reached, once it is passed.
 - A trend chart of the last 7 days or 8 weeks, with the limit marked.
 - In the History window, a trend chart that scrolls back through all history and zooms out to a
-  year of days or ten years of weeks.
+  year of days or ten years of weeks, or a calendar of a year of days.
 - A matching list of those days or weeks.
 - Which days or weeks are marked as PTO.
 - Manual pause and resume.
@@ -37,6 +37,15 @@ pinch, use the magnifier buttons, or press ⌘+ and ⌘− to zoom between fixed
 a year of days, or from 8 weeks to ten years of weeks. Zooming keeps the selected day or week in
 place, and selecting one in the list scrolls the chart to it. Once zoomed out past a few weeks, a
 line shows the trailing 7-day or 4-week average.
+
+The **Chart / Calendar** switch in the trend card's header swaps the chart for a calendar: a
+year of days as a grid of squares, one column per week, like a GitHub contributions graph. Shading
+deepens with the hours tracked, in quarters of the daily limit. Days over the daily limit are red,
+in four shades that deepen with the overtime: up to 30 minutes, up to an hour, up to two hours,
+and more than two hours over. PTO days are grey. It opens on the 12 months ending today; the arrows step back and forward a
+year at a time, through all recorded history. Hover over a square for its date and hours, and
+click it to select that day, or in Weeks mode the week containing it. The calendar always shows
+days, so in Weeks mode too its summary is of days.
 
 Under the chart, a summary covers whatever is in view: the total, the average day or week, how
 many were over the limit and by how much in total, and the number of PTO days. Averages leave out

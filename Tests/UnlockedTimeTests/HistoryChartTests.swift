@@ -103,6 +103,57 @@ struct HistoryChartTests {
         #expect(window.start(showing: date(2026, 5, 6), from: date(2026, 7, 6)) == date(2026, 3, 16))
     }
 
+    @Test func weeksComeToRestOnWholeWeeksAndTheEnd() {
+        let series = (0..<30).reversed().map {
+            PeriodTotal(
+                start: calendar.date(byAdding: .weekOfYear, value: -$0, to: date(2026, 8, 24))!,
+                minutes: 0,
+                limitMinutes: 2400
+            )
+        }
+        let window = ChartWindow(series: series, period: .weeks, length: 8, calendar: calendar)
+        let week = 100.5
+        let rest = { window.restingOffset(proposed: $0, contentWidth: 30 * week, containerWidth: 8 * week) }
+        let end = 22 * week
+
+        // A hair short of the end must not fall back a whole week.
+        #expect(rest(end - 1e-9) == end)
+        #expect(rest(end - 0.4 * week) == end)
+        #expect(rest(end + 50) == end)
+        #expect(rest(end - 0.6 * week) == 21 * week)
+        #expect(rest(1.4 * week) == week)
+        #expect(rest(1.6 * week) == 2 * week)
+        #expect(rest(-20) == 0)
+        #expect(window.restingOffset(proposed: 30, contentWidth: 500, containerWidth: 804) == 0)
+    }
+
+    @Test func daysComeToRestOnWholeDaysAndTheEnd() {
+        let window = days(count: 60, length: 7)
+        let day = 804.0 / 7
+        let rest = { window.restingOffset(proposed: $0, contentWidth: 60 * day, containerWidth: 804) }
+        let end = 53 * day
+
+        #expect(abs(rest(end - 1e-6) - end) < 1e-9)
+        #expect(abs(rest(3.4 * day) - 3 * day) < 1e-9)
+        #expect(abs(rest(3.6 * day) - 4 * day) < 1e-9)
+    }
+
+    @Test func reachesTheEndWhenADaylightSavingChangeIsShown() {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "Europe/Copenhagen")!
+        let last = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30))!
+        let series = (0..<10).reversed().map {
+            PeriodTotal(start: calendar.date(byAdding: .day, value: -$0, to: last)!, minutes: 0, limitMinutes: 480)
+        }
+        let window = ChartWindow(series: series, period: .days, length: 7, calendar: calendar)
+        // Clocks go back on 25 October, so the last seven days' worth of seconds starts at 01:00, not midnight.
+        let pointsPerSecond = 804.0 / (7 * 86_400)
+        let contentWidth = (10 * 86_400 + 3_600) * pointsPerSecond
+        let end = contentWidth - 804
+
+        #expect(abs(window.restingOffset(proposed: end - 1, contentWidth: contentWidth, containerWidth: 804) - end) < 1e-9)
+    }
+
     @Test func summarisesTheRangeWithoutTheCurrentPeriodInTheAverage() {
         let totals = [
             PeriodTotal(start: date(2026, 8, 3), minutes: 2700, limitMinutes: 2400),
