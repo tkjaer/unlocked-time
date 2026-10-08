@@ -59,6 +59,10 @@ extension HistoryPeriod {
 
     /// Periods in the trailing average drawn when zoomed out.
     var averageWindow: Int { self == .days ? 7 : 4 }
+
+    func includesInAverage(_ total: PeriodTotal, calendar: Calendar = .current) -> Bool {
+        self == .weeks || (!calendar.isDateInWeekend(total.start) && !total.isPTO)
+    }
 }
 
 /// The visible slice of a scrollable chart, as calendar periods rather than raw seconds.
@@ -197,11 +201,15 @@ struct HistoryChart: View {
 
     private var averages: [PeriodAverage] {
         guard showsAverage else { return [] }
-        return TimeSummary.rollingAverage(Array(series.dropLast()), window: period.averageWindow)
+        return TimeSummary.rollingAverage(Array(series.dropLast()), window: period.averageWindow) {
+            period.includesInAverage($0, calendar: calendar)
+        }
     }
 
     private var summary: RangeSummary {
-        TimeSummary.rangeSummary(visible, inProgress: inProgress)
+        TimeSummary.rangeSummary(visible, inProgress: inProgress) {
+            period.includesInAverage($0, calendar: calendar)
+        }
     }
 
     private var visiblePTODays: Int {

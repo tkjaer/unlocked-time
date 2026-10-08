@@ -100,6 +100,23 @@ struct HistoryChartTests {
         #expect(summary.averageMinutes == 2400)
     }
 
+    @Test func dailyAverageExcludesWorkedWeekendsAndPTO() {
+        let totals = [
+            PeriodTotal(start: date(2026, 8, 7), minutes: 420, limitMinutes: 420),
+            PeriodTotal(start: date(2026, 8, 8), minutes: 60, limitMinutes: 420),
+            PeriodTotal(start: date(2026, 8, 10), minutes: 120, limitMinutes: 420, isPTO: true),
+            PeriodTotal(start: date(2026, 8, 11), minutes: 480, limitMinutes: 420)
+        ]
+
+        let summary = TimeSummary.rangeSummary(totals) {
+            HistoryPeriod.days.includesInAverage($0, calendar: calendar)
+        }
+
+        #expect(summary.totalMinutes == 1080)
+        #expect(summary.overageMinutes == 60)
+        #expect(summary.averageMinutes == 450)
+    }
+
     @Test func rollingAverageSkipsPeriodsWithoutTime() {
         let totals = [60, 0, 120, 0, 0, 0, 240].enumerated().map { offset, minutes in
             PeriodTotal(start: date(2026, 8, 1 + offset), minutes: minutes, limitMinutes: 480)
@@ -109,6 +126,21 @@ struct HistoryChartTests {
 
         #expect(averages.map(\.minutes) == [60, 60, 90, 120, 120, 240])
         #expect(averages.map(\.start) == [1, 2, 3, 4, 5, 7].map { date(2026, 8, $0) })
+    }
+
+    @Test func dailyRollingAverageExcludesWorkedWeekendsAndPTO() {
+        let totals = [
+            PeriodTotal(start: date(2026, 8, 7), minutes: 420, limitMinutes: 420),
+            PeriodTotal(start: date(2026, 8, 8), minutes: 60, limitMinutes: 420),
+            PeriodTotal(start: date(2026, 8, 10), minutes: 120, limitMinutes: 420, isPTO: true),
+            PeriodTotal(start: date(2026, 8, 11), minutes: 480, limitMinutes: 420)
+        ]
+
+        let averages = TimeSummary.rollingAverage(totals, window: 7) {
+            HistoryPeriod.days.includesInAverage($0, calendar: calendar)
+        }
+
+        #expect(averages.last?.minutes == 450)
     }
 
     @Test func countsPTODaysInARange() {

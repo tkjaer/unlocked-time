@@ -287,11 +287,17 @@ enum TimeSummary {
         )
     }
 
-    /// Totals for a stretch of periods. The average leaves out the period still in progress and
-    /// periods without tracked time, so weekends and PTO do not pull it down.
-    static func rangeSummary(_ totals: [PeriodTotal], inProgress: Date? = nil) -> RangeSummary {
+    /// Totals for a stretch of periods. The average leaves out the period still in progress,
+    /// periods without tracked time, and periods the caller does not consider regular work.
+    static func rangeSummary(
+        _ totals: [PeriodTotal],
+        inProgress: Date? = nil,
+        includeInAverage: (PeriodTotal) -> Bool = { _ in true }
+    ) -> RangeSummary {
         let overage = overage(totals)
-        let worked = totals.filter { $0.minutes > 0 && $0.start != inProgress }
+        let worked = totals.filter {
+            $0.minutes > 0 && $0.start != inProgress && includeInAverage($0)
+        }
         return RangeSummary(
             totalMinutes: totals.reduce(0) { $0 + $1.minutes },
             periodCount: totals.count,
@@ -301,12 +307,18 @@ enum TimeSummary {
         )
     }
 
-    /// Trailing mean over the periods with tracked time, so weekends and PTO do not pull it below
-    /// the limit it is read against. Periods with nothing tracked in the window get no point.
-    static func rollingAverage(_ totals: [PeriodTotal], window: Int) -> [PeriodAverage] {
+    /// Trailing mean over eligible periods with tracked time. Periods without an eligible worked
+    /// period in the window get no point.
+    static func rollingAverage(
+        _ totals: [PeriodTotal],
+        window: Int,
+        includeInAverage: (PeriodTotal) -> Bool = { _ in true }
+    ) -> [PeriodAverage] {
         guard window > 0 else { return [] }
         return totals.indices.compactMap { index in
-            let worked = totals[max(0, index - window + 1)...index].filter { $0.minutes > 0 }
+            let worked = totals[max(0, index - window + 1)...index].filter {
+                $0.minutes > 0 && includeInAverage($0)
+            }
             guard !worked.isEmpty else { return nil }
             return PeriodAverage(
                 start: totals[index].start,
