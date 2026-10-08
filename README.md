@@ -162,6 +162,26 @@ iconutil -c icns App/AppIcon.iconset -o App/AppIcon.icns
 swift test
 ```
 
+## Release
+
+Set both bundle versions, then test, build, and merge the version change before creating the tag:
+
+```sh
+Tools/set-version.sh 0.0.5 5
+swift test
+./build-app.sh
+```
+
+Tag the merged commit and push only the tag:
+
+```sh
+git tag v0.0.5
+git push origin v0.0.5
+```
+
+Do not create the GitHub release manually. Pushing the tag runs the release workflow, which checks
+that the tag is on `main` and matches `CFBundleShortVersionString` before publishing the release.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
