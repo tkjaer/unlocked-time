@@ -181,7 +181,37 @@ enum HeatmapScale {
         }
     }
 
-    static let over = Color.red.opacity(0.85)
+    static let overLevels = 4
+
+    /// 0 when not over, then up to 30 minutes, up to an hour, up to two hours, and more over.
+    static func overLevel(overageMinutes: Int) -> Int {
+        switch overageMinutes {
+        case ...0: 0
+        case ...30: 1
+        case ...60: 2
+        case ...120: 3
+        default: 4
+        }
+    }
+
+    /// Reds at rising strength, ending almost black so the worst days stand out.
+    static func overColor(level: Int) -> Color {
+        switch level {
+        case ...1: Color.red.opacity(0.35)
+        case 2: Color.red.opacity(0.65)
+        case 3: Color.red
+        default: Color(.sRGB, red: 0x4A / 255, green: 0x0A / 255, blue: 0x0A / 255)
+        }
+    }
+
+    /// The near-black deepest red vanishes on a dark background, so in dark mode it gets a red
+    /// edge. Clear in light mode.
+    static let deepestOutline = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor.systemRed.withAlphaComponent(0.9)
+            : .clear
+    })
+
     static let pto = Color.gray.opacity(0.55)
 }
 
@@ -229,7 +259,7 @@ struct CalendarHeatmap: View {
                     ForEach(0..<layout.columns, id: \.self) { column in
                         VStack(spacing: Self.spacing) {
                             ForEach(0..<7, id: \.self) { row in
-                                cellView(layout.cell(column: column, row: row), selectedDay: selectedDay)
+                                cellView(layout.cell(column: column, row: row), selectedDay: selectedDay, inSelectedWeek: column == selectedColumn)
                             }
                         }
                         .padding(1.5)
@@ -248,22 +278,35 @@ struct CalendarHeatmap: View {
     }
 
     @ViewBuilder
-    private func cellView(_ cell: HeatmapLayout.Cell?, selectedDay: Date?) -> some View {
+    private func cellView(_ cell: HeatmapLayout.Cell?, selectedDay: Date?, inSelectedWeek: Bool) -> some View {
         if let cell {
             let isSelected = selectedDay == cell.date
-            RoundedRectangle(cornerRadius: 2)
-                .fill(color(for: cell))
-                .frame(width: Self.cellSize, height: Self.cellSize)
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 2.5)
-                            .strokeBorder(Color.primary.opacity(0.85), lineWidth: 1.5)
-                            .padding(-1.5)
+            let text = helpText(for: cell)
+            Button {
+                select(cell)
+            } label: {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(color(for: cell))
+                    .frame(width: Self.cellSize, height: Self.cellSize)
+                    .overlay {
+                        if overLevel(for: cell) == HeatmapScale.overLevels {
+                            RoundedRectangle(cornerRadius: 2)
+                                .strokeBorder(HeatmapScale.deepestOutline, lineWidth: 1)
+                        }
                     }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture { select(cell) }
-                .help(helpText(for: cell))
+                    .overlay {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 2.5)
+                                .strokeBorder(Color.primary.opacity(0.85), lineWidth: 1.5)
+                                .padding(-1.5)
+                        }
+                    }
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(text)
+            .accessibilityLabel(text)
+            .accessibilityAddTraits(isSelected || inSelectedWeek ? .isSelected : [])
         } else {
             Color.clear.frame(width: Self.cellSize, height: Self.cellSize)
         }
@@ -271,9 +314,14 @@ struct CalendarHeatmap: View {
 
     private func color(for cell: HeatmapLayout.Cell) -> Color {
         guard let total = cell.total else { return HeatmapScale.color(level: 0) }
-        if total.isOver { return HeatmapScale.over }
+        if total.isOver { return HeatmapScale.overColor(level: overLevel(for: cell)) }
         if total.isPTO { return HeatmapScale.pto }
         return HeatmapScale.color(level: HeatmapScale.level(minutes: total.minutes, limitMinutes: total.limitMinutes))
+    }
+
+    private func overLevel(for cell: HeatmapLayout.Cell) -> Int {
+        guard let total = cell.total, total.isOver else { return 0 }
+        return HeatmapScale.overLevel(overageMinutes: total.overageMinutes)
     }
 
     private func helpText(for cell: HeatmapLayout.Cell) -> String {
@@ -299,7 +347,7 @@ struct CalendarHeatmap: View {
     }
 }
 
-/// "Less ▢▢▢▢▢ More", then the over-limit and PTO colours.
+/// "Less ▢▢▢▢▢ More", then the four over-limit reds and the PTO colour.
 struct HeatmapLegend: View {
     let limitMinutes: Int
 
@@ -311,9 +359,20 @@ struct HeatmapLegend: View {
             }
             Text("More")
                 .padding(.trailing, 8)
-            swatch(HeatmapScale.over)
-            Text("Over the \(formatMinutes(limitMinutes)) daily limit")
-                .padding(.trailing, 8)
+            Text("Over the \(formatMinutes(limitMinutes)) limit by")
+                .padding(.trailing, 2)
+            ForEach(Array(zip(1...HeatmapScale.overLevels, ["≤30m", "≤1h", "≤2h", ">2h"])), id: \.0) { level, title in
+                swatch(HeatmapScale.overColor(level: level))
+                    .overlay {
+                        if level == HeatmapScale.overLevels {
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .strokeBorder(HeatmapScale.deepestOutline, lineWidth: 1)
+                        }
+                    }
+                Text(title)
+                    .padding(.trailing, 4)
+            }
+            Spacer().frame(width: 4)
             swatch(HeatmapScale.pto)
             Text("PTO")
         }

@@ -168,6 +168,12 @@ struct CalendarHeatmapTests {
         #expect(HeatmapScale.level(minutes: 0, limitMinutes: 0) == 0)
     }
 
+    @Test func overtimeDeepensAtHalfAnHourAnHourAndTwoHours() {
+        let levels = [0, 1, 30, 31, 60, 61, 120, 121, 600].map { HeatmapScale.overLevel(overageMinutes: $0) }
+
+        #expect(levels == [0, 1, 1, 2, 2, 3, 3, 4, 4])
+    }
+
     private func days(count: Int, endingOn end: Date) -> [PeriodTotal] {
         (0..<count).reversed().map {
             PeriodTotal(start: calendar.date(byAdding: .day, value: -$0, to: end)!, minutes: 60, limitMinutes: 480)

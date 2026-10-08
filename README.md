@@ -40,8 +40,9 @@ line shows the trailing 7-day or 4-week average.
 
 The **Chart / Calendar** switch in the trend card's header swaps the chart for a calendar: a
 year of days as a grid of squares, one column per week, like a GitHub contributions graph. Shading
-deepens with the hours tracked, in quarters of the daily limit. Days over the daily limit are red
-and PTO days are grey. It opens on the 12 months ending today; the arrows step back and forward a
+deepens with the hours tracked, in quarters of the daily limit. Days over the daily limit are red,
+in four shades that deepen with the overtime: up to 30 minutes, up to an hour, up to two hours,
+and more than two hours over. PTO days are grey. It opens on the 12 months ending today; the arrows step back and forward a
 year at a time, through all recorded history. Hover over a square for its date and hours, and
 click it to select that day, or in Weeks mode the week containing it. The calendar always shows
 days, so in Weeks mode too its summary is of days.
