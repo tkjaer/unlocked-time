@@ -287,6 +287,58 @@ enum TimeSummary {
         )
     }
 
+    /// Totals for a stretch of periods. The average leaves out the period still in progress,
+    /// periods without tracked time, and periods the caller does not consider regular work.
+    static func rangeSummary(
+        _ totals: [PeriodTotal],
+        inProgress: Date? = nil,
+        includeInAverage: (PeriodTotal) -> Bool = { _ in true }
+    ) -> RangeSummary {
+        let overage = overage(totals)
+        let worked = totals.filter {
+            $0.minutes > 0 && $0.start != inProgress && includeInAverage($0)
+        }
+        return RangeSummary(
+            totalMinutes: totals.reduce(0) { $0 + $1.minutes },
+            periodCount: totals.count,
+            periodsOver: overage.periodsOver,
+            overageMinutes: overage.minutes,
+            averageMinutes: worked.isEmpty ? 0 : worked.reduce(0) { $0 + $1.minutes } / worked.count
+        )
+    }
+
+    /// Trailing mean over eligible periods with tracked time. Periods without an eligible worked
+    /// period in the window get no point.
+    static func rollingAverage(
+        _ totals: [PeriodTotal],
+        window: Int,
+        includeInAverage: (PeriodTotal) -> Bool = { _ in true }
+    ) -> [PeriodAverage] {
+        guard window > 0 else { return [] }
+        return totals.indices.compactMap { index in
+            let worked = totals[max(0, index - window + 1)...index].filter {
+                $0.minutes > 0 && includeInAverage($0)
+            }
+            guard !worked.isEmpty else { return nil }
+            return PeriodAverage(
+                start: totals[index].start,
+                minutes: worked.reduce(0) { $0 + $1.minutes } / worked.count
+            )
+        }
+    }
+
+    static func ptoDayCount(
+        _ ptoDays: Set<String>,
+        from start: Date,
+        to end: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        ptoDays
+            .compactMap { date(fromDayKey: $0, calendar: calendar) }
+            .filter { $0 >= start && $0 < end }
+            .count
+    }
+
     private static func series(
         totals: [PeriodTotal],
         anchor: Date,
@@ -347,6 +399,21 @@ struct OverageSummary: Equatable, Sendable {
     var minutes = 0
 
     var isClean: Bool { periodsOver == 0 }
+}
+
+struct RangeSummary: Equatable, Sendable {
+    var totalMinutes = 0
+    var periodCount = 0
+    var periodsOver = 0
+    var overageMinutes = 0
+    var averageMinutes = 0
+}
+
+struct PeriodAverage: Identifiable, Equatable, Sendable {
+    let start: Date
+    let minutes: Int
+
+    var id: Date { start }
 }
 
 enum LimitCheck {

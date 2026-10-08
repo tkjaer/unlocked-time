@@ -52,14 +52,14 @@ struct HistoryWindowView: View {
                 from: calendar.startOfDay(for: earliest),
                 to: calendar.startOfDay(for: controller.now)
             ).day ?? 0
-            return min(max(days + 1, period.count), 3660)
+            return max(days + 1, period.count)
         case .weeks:
             guard
                 let from = calendar.dateInterval(of: .weekOfYear, for: earliest)?.start,
                 let to = calendar.dateInterval(of: .weekOfYear, for: controller.now)?.start
             else { return period.count }
             let weeks = calendar.dateComponents([.weekOfYear], from: from, to: to).weekOfYear ?? 0
-            return min(max(weeks + 1, period.count), 520)
+            return max(weeks + 1, period.count)
         }
     }
 
@@ -84,25 +84,6 @@ struct HistoryWindowView: View {
                 reducesLimitForPTO: controller.settings.ptoReducesWeeklyLimit
             )
         }
-    }
-
-    /// Keeps the charted window anchored on the selection so it stays visible.
-    private var chartSeries: [PeriodTotal] {
-        let window = period.count
-        let selected = period == .weeks ? weekStart : selectedDay
-        let granularity: Calendar.Component = period == .days ? .day : .weekOfYear
-
-        guard
-            let selected,
-            let index = topSeries.lastIndex(where: {
-                calendar.isDate($0.start, equalTo: selected, toGranularity: granularity)
-            })
-        else {
-            return Array(topSeries.suffix(window))
-        }
-
-        let end = index + 1
-        return Array(topSeries[max(0, end - window)..<end])
     }
 
     private var weekStart: Date? {
@@ -130,17 +111,19 @@ struct HistoryWindowView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        // Built once per update: a long history makes the series costly to rebuild.
+        let topSeries = topSeries
+
+        return VStack(spacing: 0) {
             header
 
             Divider()
 
             VStack(spacing: 12) {
-                TrendCard(
-                    series: chartSeries,
+                HistoryChart(
+                    series: topSeries,
                     period: period,
-                    selection: $period,
-                    showsPicker: false,
+                    ptoDays: controller.ptoDays,
                     selectedStart: period == .weeks ? weekStart : selectedDay,
                     onSelect: selectFromChart
                 )
@@ -188,7 +171,7 @@ struct HistoryWindowView: View {
             }
             .padding(16)
         }
-        .frame(width: 880, height: 640)
+        .frame(width: 880, height: 670)
         .sheet(item: $editing) { draft in
             SessionEditor(draft: draft) { start, end in
                 if let id = draft.sessionID {
@@ -401,7 +384,8 @@ private struct HistoryColumn<Content: View>: View {
             Divider()
 
             ScrollView {
-                VStack(spacing: 0) {
+                // Lazy, so a long history only builds the rows on screen.
+                LazyVStack(spacing: 0) {
                     content
                 }
                 .padding(.horizontal, 5)

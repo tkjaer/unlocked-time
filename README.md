@@ -21,15 +21,28 @@ them.
 - Remaining time, or a red over-limit amount.
 - The moment the weekly limit was reached, once it is passed.
 - A trend chart of the last 7 days or 8 weeks, with the limit marked.
+- In the History window, a trend chart that scrolls back through all history and zooms out to a
+  year of days or ten years of weeks.
 - A matching list of those days or weeks.
 - Which days or weeks are marked as PTO.
 - Manual pause and resume.
 
 ## History
 
-The list starts on the last 7 days or the last 8 weeks. Clicking a week opens that week's days,
-and clicking a day opens the individual sessions worked that day, with start and end times. The
-chevron by the title steps back up, and closing the panel returns it to the top level.
+The list covers everything recorded, newest first. Clicking a week opens that week's days,
+and clicking a day opens the individual sessions worked that day, with start and end times.
+
+The trend chart starts on the last 7 days or 8 weeks. Scroll it sideways to go back in time, and
+pinch, use the magnifier buttons, or press ⌘+ and ⌘− to zoom between fixed spans: from a week to
+a year of days, or from 8 weeks to ten years of weeks. Zooming keeps the selected day or week in
+place, and selecting one in the list scrolls the chart to it. Once zoomed out past a few weeks, a
+line shows the trailing 7-day or 4-week average.
+
+Under the chart, a summary covers whatever is in view: the total, the average day or week, how
+many were over the limit and by how much in total, and the number of PTO days. Averages leave out
+days or weeks without tracked time, and the one still in progress. Day averages also leave out
+weekends and PTO days, so they compare with the daily limit. Time tracked on those days still
+counts towards the total and the overage.
 
 Sessions can be corrected: right-click one to edit or delete it, or use the plus button in the
 sessions column to add a session to the selected day. The session running now cannot be edited,
