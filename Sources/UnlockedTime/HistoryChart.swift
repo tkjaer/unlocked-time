@@ -158,11 +158,45 @@ struct ChartWindow {
         return clamp(add(-length, to: old.add(oldLength, to: current)))
     }
 
+    /// Where a scroll comes to rest, in points from the leading edge of the scrolled content:
+    /// the nearest period start, or the very end when that is nearer, so the latest period is
+    /// always reachable. Works from the domain rather than from the chart's own value lookup,
+    /// which can be a hair short of a period start at the end, or still use the previous
+    /// period's scale just after switching between days and weeks.
+    func restingOffset(proposed: Double, contentWidth: Double, containerWidth: Double) -> Double {
+        let maxOffset = max(0, contentWidth - containerWidth)
+        let span = domain.upperBound.timeIntervalSince(domain.lowerBound)
+        guard contentWidth > 0, span > 0 else { return 0 }
+
+        let pointsPerSecond = contentWidth / span
+        let proposed = min(max(proposed, 0), maxOffset)
+        let date = domain.lowerBound.addingTimeInterval(proposed / pointsPerSecond)
+        let start = periodStart(for: date)
+
+        let candidates = [start, add(1, to: start)]
+            .map { $0.timeIntervalSince(domain.lowerBound) * pointsPerSecond }
+            .filter { $0 >= 0 && $0 < maxOffset } + [0, maxOffset]
+        return candidates.min { abs($0 - proposed) < abs($1 - proposed) } ?? 0
+    }
+
     private func periods(from start: Date, to end: Date) -> Int {
         switch period {
         case .days: calendar.dateComponents([.day], from: start, to: end).day ?? 0
         case .weeks: calendar.dateComponents([.weekOfYear], from: start, to: end).weekOfYear ?? 0
         }
+    }
+}
+
+/// Snaps scrolling to whole days or weeks, using `ChartWindow.restingOffset`.
+struct PeriodScrollTargetBehavior: ChartScrollTargetBehavior {
+    let window: ChartWindow
+
+    func updateTarget(_ target: inout ScrollTarget, context: ChartScrollTargetBehaviorContext) {
+        target.rect.origin.x = window.restingOffset(
+            proposed: target.rect.origin.x,
+            contentWidth: context.contentSize.width,
+            containerWidth: context.containerSize.width
+        )
     }
 }
 
@@ -456,7 +490,7 @@ struct HistoryChart: View {
         .chartScrollableAxes(.horizontal)
         .chartXVisibleDomain(length: window.visibleSeconds)
         .chartScrollPosition(x: $scrollStart)
-        .chartScrollTargetBehavior(.valueAligned(matching: alignment))
+        .chartScrollTargetBehavior(PeriodScrollTargetBehavior(window: window))
         .chartYAxis {
             AxisMarks(position: .leading, values: HourAxis.ticks(upTo: upperBound)) { value in
                 AxisGridLine().foregroundStyle(.quaternary)
@@ -557,13 +591,6 @@ struct HistoryChart: View {
         return (first.start..<max(end, first.start)).formatted(
             .interval.day().month(.abbreviated).year()
         )
-    }
-
-    private var alignment: DateComponents {
-        switch period {
-        case .days: DateComponents(hour: 0)
-        case .weeks: DateComponents(hour: 0, weekday: calendar.firstWeekday)
-        }
     }
 
     private var axis: (component: Calendar.Component, count: Int, isCentered: Bool, style: AxisStyle) {
