@@ -194,23 +194,22 @@ enum HeatmapScale {
         }
     }
 
-    /// Reds at rising strength, ending almost black so the worst days stand out.
+    /// Solid reds, so they keep their order on any background: even steps in lightness at one
+    /// hue, from a light red to a deep maroon.
     static func overColor(level: Int) -> Color {
-        switch level {
-        case ...1: Color.red.opacity(0.35)
-        case 2: Color.red.opacity(0.65)
-        case 3: Color.red
-        default: Color(.sRGB, red: 0x4A / 255, green: 0x0A / 255, blue: 0x0A / 255)
+        let hex: UInt32 = switch level {
+        case ...1: 0xFC958C
+        case 2: 0xE4615A
+        case 3: 0xC3292D
+        default: 0x8B1A1C
         }
+        return Color(
+            .sRGB,
+            red: Double(hex >> 16 & 0xFF) / 255,
+            green: Double(hex >> 8 & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255
+        )
     }
-
-    /// The near-black deepest red vanishes on a dark background, so in dark mode it gets a red
-    /// edge. Clear in light mode.
-    static let deepestOutline = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor.systemRed.withAlphaComponent(0.9)
-            : .clear
-    })
 
     static let pto = Color.gray.opacity(0.55)
 }
@@ -289,12 +288,6 @@ struct CalendarHeatmap: View {
                     .fill(color(for: cell))
                     .frame(width: Self.cellSize, height: Self.cellSize)
                     .overlay {
-                        if overLevel(for: cell) == HeatmapScale.overLevels {
-                            RoundedRectangle(cornerRadius: 2)
-                                .strokeBorder(HeatmapScale.deepestOutline, lineWidth: 1)
-                        }
-                    }
-                    .overlay {
                         if isSelected {
                             RoundedRectangle(cornerRadius: 2.5)
                                 .strokeBorder(Color.primary.opacity(0.85), lineWidth: 1.5)
@@ -314,14 +307,11 @@ struct CalendarHeatmap: View {
 
     private func color(for cell: HeatmapLayout.Cell) -> Color {
         guard let total = cell.total else { return HeatmapScale.color(level: 0) }
-        if total.isOver { return HeatmapScale.overColor(level: overLevel(for: cell)) }
+        if total.isOver {
+            return HeatmapScale.overColor(level: HeatmapScale.overLevel(overageMinutes: total.overageMinutes))
+        }
         if total.isPTO { return HeatmapScale.pto }
         return HeatmapScale.color(level: HeatmapScale.level(minutes: total.minutes, limitMinutes: total.limitMinutes))
-    }
-
-    private func overLevel(for cell: HeatmapLayout.Cell) -> Int {
-        guard let total = cell.total, total.isOver else { return 0 }
-        return HeatmapScale.overLevel(overageMinutes: total.overageMinutes)
     }
 
     private func helpText(for cell: HeatmapLayout.Cell) -> String {
@@ -363,12 +353,6 @@ struct HeatmapLegend: View {
                 .padding(.trailing, 2)
             ForEach(Array(zip(1...HeatmapScale.overLevels, ["≤30m", "≤1h", "≤2h", ">2h"])), id: \.0) { level, title in
                 swatch(HeatmapScale.overColor(level: level))
-                    .overlay {
-                        if level == HeatmapScale.overLevels {
-                            RoundedRectangle(cornerRadius: 1.5)
-                                .strokeBorder(HeatmapScale.deepestOutline, lineWidth: 1)
-                        }
-                    }
                 Text(title)
                     .padding(.trailing, 4)
             }
