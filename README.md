@@ -22,7 +22,7 @@ them.
 - The moment the weekly limit was reached, once it is passed.
 - A trend chart of the last 7 days or 8 weeks, with the limit marked.
 - In the History window, a trend chart that scrolls back through all history and zooms out to a
-  year of days or all weeks.
+  year of days or ten years of weeks.
 - A matching list of those days or weeks.
 - Which days or weeks are marked as PTO.
 - Manual pause and resume.
@@ -34,9 +34,9 @@ and clicking a day opens the individual sessions worked that day, with start and
 
 The trend chart starts on the last 7 days or 8 weeks. Scroll it sideways to go back in time, and
 pinch, use the magnifier buttons, or press ⌘+ and ⌘− to zoom between fixed spans: from a week to
-a year of days, or from 8 weeks to all weeks. Zooming keeps the selected day or week in place, and
-selecting one in the list scrolls the chart to it. Once zoomed out past a few weeks, a line shows
-the trailing 7-day or 4-week average.
+a year of days, or from 8 weeks to ten years of weeks. Zooming keeps the selected day or week in
+place, and selecting one in the list scrolls the chart to it. Once zoomed out past a few weeks, a
+line shows the trailing 7-day or 4-week average.
 
 Under the chart, a summary covers whatever is in view: the total, the average day or week, how
 many were over the limit and by how much in total, and the number of PTO days. Averages leave out

@@ -14,7 +14,8 @@ struct HistoryChartTests {
         #expect(HistoryPeriod.weeks.zoomLevels(available: 20).map(\.count) == [8, 13, 20])
         #expect(HistoryPeriod.weeks.zoomLevels(available: 20).last?.title == "All")
         #expect(HistoryPeriod.weeks.zoomLevels(available: 52).last?.title == "1 year")
-        #expect(HistoryPeriod.weeks.zoomLevels(available: 300).map(\.count) == [8, 13, 26, 52, 104, 300])
+        #expect(HistoryPeriod.weeks.zoomLevels(available: 300).map(\.count) == [8, 13, 26, 52, 104, 260, 300])
+        #expect(HistoryPeriod.weeks.zoomLevels(available: 2000).map(\.count) == [8, 13, 26, 52, 104, 260, 520])
     }
 
     @Test func dayZoomStopsAtAYear() {
@@ -37,6 +38,25 @@ struct HistoryChartTests {
 
         #expect(start == date(2026, 8, 4))
         #expect(window.visible(from: start).last?.start == date(2026, 8, 10))
+    }
+
+    @Test func drawsOnlyAroundTheVisibleWindow() {
+        let window = days(count: 5000, length: 7)
+        let rendered = window.rendered(around: date(2026, 8, 1))
+
+        #expect(rendered.count == 21)
+        #expect(rendered.first?.start == date(2026, 7, 25))
+        #expect(rendered.last?.start == date(2026, 8, 14))
+    }
+
+    @Test func reachesTheOldestPeriodOfALongHistory() {
+        let window = days(count: 5000, length: 365)
+        let oldest = window.series[0].start
+        let start = window.start(showing: oldest, from: window.initialStart(showing: nil))
+
+        #expect(start == oldest)
+        #expect(window.visible(from: start).first?.start == oldest)
+        #expect(window.rendered(around: start).contains { $0.start == oldest })
     }
 
     @Test func leavesTheWindowAloneWhenTheSelectionIsShown() {

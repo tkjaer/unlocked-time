@@ -37,19 +37,22 @@ extension HistoryPeriod {
                 ChartZoom(count: 13, title: "3 months"),
                 ChartZoom(count: 26, title: "6 months"),
                 ChartZoom(count: 52, title: "1 year"),
-                ChartZoom(count: 104, title: "2 years")
+                ChartZoom(count: 104, title: "2 years"),
+                ChartZoom(count: 260, title: "5 years"),
+                ChartZoom(count: 520, title: "10 years")
             ]
         }
     }
 
-    /// Closest first. The widest step shows all of `available`, except that days stop at a year,
-    /// where bars are already about two points wide; weeks cover longer spans.
+    /// Closest first. The widest step shows all of `available`, up to a year of days or ten
+    /// years of weeks, where bars are already about two points wide. Older history is reached by
+    /// scrolling.
     func zoomLevels(available: Int) -> [ChartZoom] {
         let presets = zoomPresets
         var levels = presets.filter { $0.count < available }
         guard !levels.isEmpty else { return [presets[0]] }
 
-        if let widest = presets.last, available > widest.count, self == .days {
+        if let widest = presets.last, available > widest.count {
             return levels
         }
         let title = presets.first { $0.count == available }?.title ?? "All"
@@ -109,7 +112,20 @@ struct ChartWindow {
     }
 
     func visible(from start: Date) -> [PeriodTotal] {
-        series.filter { isVisible($0.start, from: start) }
+        // Series entries already start their period, so plain comparisons do; this runs per bar.
+        let end = add(length, to: start)
+        return series.filter {
+            let middle = $0.start.addingTimeInterval(unitSeconds / 2)
+            return middle >= start && middle < end
+        }
+    }
+
+    /// The periods worth drawing: the visible ones plus a window either side, so scrolling never
+    /// reaches an undrawn bar however long the history is.
+    func rendered(around start: Date) -> [PeriodTotal] {
+        let from = add(-length, to: start)
+        let to = add(2 * length, to: start)
+        return series.filter { $0.start >= from && $0.start < to }
     }
 
     /// The latest periods, or the selection as the rightmost bar when it is older than that.
@@ -199,11 +215,17 @@ struct HistoryChart: View {
         max(Double(max(series.map(\.minutes).max() ?? 0, limitMinutes)) * 1.18, 60)
     }
 
+    private var rendered: [PeriodTotal] { window.rendered(around: scrollStart) }
+
+    /// Worked out from the periods just before the drawn ones too, so the line starts correct.
     private var averages: [PeriodAverage] {
-        guard showsAverage else { return [] }
-        return TimeSummary.rollingAverage(Array(series.dropLast()), window: period.averageWindow) {
+        guard showsAverage, let first = rendered.first, let last = rendered.last else { return [] }
+        let from = window.add(-period.averageWindow, to: first.start)
+        let source = series.dropLast().filter { $0.start >= from && $0.start <= last.start }
+        return TimeSummary.rollingAverage(Array(source), window: period.averageWindow) {
             period.includesInAverage($0, calendar: calendar)
         }
+        .filter { $0.start >= first.start }
     }
 
     private var summary: RangeSummary {
@@ -296,7 +318,7 @@ struct HistoryChart: View {
 
     private var chart: some View {
         Chart {
-            ForEach(series) { total in
+            ForEach(rendered) { total in
                 BarMark(
                     x: .value("Period", total.start, unit: window.unit),
                     y: .value("Minutes", Double(total.minutes)),
@@ -310,7 +332,7 @@ struct HistoryChart: View {
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 .foregroundStyle(Color.secondary.opacity(0.55))
 
-            ForEach(series.filter { $0.isPTO && $0.minutes == 0 }) { total in
+            ForEach(rendered.filter { $0.isPTO && $0.minutes == 0 }) { total in
                 BarMark(
                     x: .value("Period", total.start, unit: window.unit),
                     yStart: .value("From", 0.0),

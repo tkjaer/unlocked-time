@@ -52,14 +52,14 @@ struct HistoryWindowView: View {
                 from: calendar.startOfDay(for: earliest),
                 to: calendar.startOfDay(for: controller.now)
             ).day ?? 0
-            return min(max(days + 1, period.count), 3660)
+            return max(days + 1, period.count)
         case .weeks:
             guard
                 let from = calendar.dateInterval(of: .weekOfYear, for: earliest)?.start,
                 let to = calendar.dateInterval(of: .weekOfYear, for: controller.now)?.start
             else { return period.count }
             let weeks = calendar.dateComponents([.weekOfYear], from: from, to: to).weekOfYear ?? 0
-            return min(max(weeks + 1, period.count), 520)
+            return max(weeks + 1, period.count)
         }
     }
 
@@ -111,7 +111,10 @@ struct HistoryWindowView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        // Built once per update: a long history makes the series costly to rebuild.
+        let topSeries = topSeries
+
+        return VStack(spacing: 0) {
             header
 
             Divider()
@@ -381,7 +384,8 @@ private struct HistoryColumn<Content: View>: View {
             Divider()
 
             ScrollView {
-                VStack(spacing: 0) {
+                // Lazy, so a long history only builds the rows on screen.
+                LazyVStack(spacing: 0) {
                     content
                 }
                 .padding(.horizontal, 5)
