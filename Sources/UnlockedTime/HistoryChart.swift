@@ -388,7 +388,11 @@ struct HistoryChart: View {
         HStack(spacing: 18) {
             stat("Total", formatMinutes(summary.totalMinutes))
             stat(period == .days ? "Average day" : "Average week", formatMinutes(summary.averageMinutes))
-                .help("Average of the \(period == .days ? "days" : "weeks") in view with tracked time, leaving out the current one.")
+                .help(
+                    period == .days
+                        ? "Average of the workdays in view with tracked time, leaving out weekends, PTO and today."
+                        : "Average of the weeks in view with tracked time, leaving out the current one."
+                )
             stat(
                 "Over limit",
                 "\(summary.periodsOver) of \(summary.periodCount)",
@@ -418,7 +422,8 @@ struct HistoryChart: View {
             parts.append("Grey marks PTO.")
         }
         if showsAverage {
-            parts.append("The line is a \(period.averageWindow)-\(unit) average of \(unit)s with tracked time.")
+            let subject = period == .days ? "workdays" : "weeks"
+            parts.append("The line is a \(period.averageWindow)-\(unit) average of \(subject) with tracked time.")
         }
         return parts.joined(separator: " ")
     }

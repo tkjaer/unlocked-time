@@ -36,11 +36,13 @@ The trend chart starts on the last 7 days or 8 weeks. Scroll it sideways to go b
 pinch, use the magnifier buttons, or press ⌘+ and ⌘− to zoom between fixed spans: from a week to
 a year of days, or from 8 weeks to all weeks. Zooming keeps the selected day or week in place, and
 selecting one in the list scrolls the chart to it. Once zoomed out past a few weeks, a line shows
-the trailing 7-day or 4-week average of the days or weeks with tracked time.
+the trailing 7-day or 4-week average.
 
 Under the chart, a summary covers whatever is in view: the total, the average day or week, how
-many were over the limit and by how much in total, and the number of PTO days. The average leaves
-out days or weeks without tracked time, and the one still in progress.
+many were over the limit and by how much in total, and the number of PTO days. Averages leave out
+days or weeks without tracked time, and the one still in progress. Day averages also leave out
+weekends and PTO days, so they compare with the daily limit. Time tracked on those days still
+counts towards the total and the overage.
 
 Sessions can be corrected: right-click one to edit or delete it, or use the plus button in the
 sessions column to add a session to the selected day. The session running now cannot be edited,
