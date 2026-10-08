@@ -49,9 +49,10 @@ days, so in Weeks mode too its summary is of days.
 
 Under the chart, a summary covers whatever is in view: the total, the average day or week, how
 many were over the limit and by how much in total, and the number of PTO days. Averages leave out
-days or weeks without tracked time, and the one still in progress. Day averages also leave out
-weekends and PTO days, so they compare with the daily limit. Time tracked on those days still
-counts towards the total and the overage.
+days or weeks without tracked time, and the one still in progress. The over-limit count uses the
+same completed periods. Day averages and counts also leave out weekends and PTO days, so they
+compare with the daily limit. Time tracked on those days still counts towards the total and the
+overage.
 
 Sessions can be corrected: right-click one to edit or delete it, or use the plus button in the
 sessions column to add a session to the selected day. The session running now cannot be edited,

@@ -551,6 +551,11 @@ struct HistoryChart: View {
                 "\(summary.periodsOver) of \(summary.periodCount)",
                 isAlert: summary.periodsOver > 0
             )
+            .help(
+                summaryPeriod == .days
+                    ? "Completed workdays over the limit, leaving out weekends, PTO and today."
+                    : "Completed weeks with tracked time over the limit, leaving out the current week."
+            )
             stat("Overage", formatMinutes(summary.overageMinutes), isAlert: summary.overageMinutes > 0)
             stat("PTO", visiblePTODays == 1 ? "1 day" : "\(visiblePTODays) days")
             Spacer(minLength: 0)

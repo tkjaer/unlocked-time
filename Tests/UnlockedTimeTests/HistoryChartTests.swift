@@ -165,7 +165,7 @@ struct HistoryChartTests {
         let summary = TimeSummary.rangeSummary(totals, inProgress: date(2026, 8, 24))
 
         #expect(summary.totalMinutes == 5400)
-        #expect(summary.periodCount == 4)
+        #expect(summary.periodCount == 2)
         #expect(summary.periodsOver == 1)
         #expect(summary.overageMinutes == 300)
         #expect(summary.averageMinutes == 2400)
@@ -184,6 +184,8 @@ struct HistoryChartTests {
         }
 
         #expect(summary.totalMinutes == 1080)
+        #expect(summary.periodCount == 2)
+        #expect(summary.periodsOver == 1)
         #expect(summary.overageMinutes == 60)
         #expect(summary.averageMinutes == 450)
     }
